@@ -1,0 +1,39 @@
+<project name="clean" default="clean" basedir=".">
+
+    <description>
+        Apache Ant script to delete the application data files 
+        in the current and tmp directory paths.
+
+        Usage: ant -f clean.xml  
+
+        See https://ant.apache.org/manual/Tasks/delete.html
+        See https://ant.apache.org/manual/Types/fileset.html
+
+        Chris Joakim, Microsoft, 2023
+    </description>
+
+    <!-- ******************************************************************* -->
+
+    <target name="clean">
+
+        <delete verbose="true">
+            <fileset dir="artifacts" casesensitive="no" defaultexcludes="yes">
+                <exclude name="**/readme.md" />
+            </fileset>
+        </delete>
+
+        <delete verbose="true">
+            <fileset dir="current" casesensitive="no" defaultexcludes="yes">
+                <exclude name="**/readme.md" />
+            </fileset>
+        </delete>
+
+        <delete verbose="true">
+            <fileset dir="tmp" casesensitive="no" defaultexcludes="yes">
+                <exclude name="**/readme.md" />
+            </fileset>
+        </delete>
+
+    </target>
+
+</project>

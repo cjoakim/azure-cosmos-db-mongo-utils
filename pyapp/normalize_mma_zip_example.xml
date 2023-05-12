@@ -1,0 +1,58 @@
+<project name="normalizeMmaZip" default="cleanup" basedir=".">
+
+    <description>
+        Apache Ant script to:
+        1) Explode a raw MMA output zip file received from customer
+        2) Create a "normalized" version of that exploded output, such that 
+           the root directory contains the assessment directories
+           (rather than having the assessment directories nested).
+
+        Usage: ant -f normalize_mma_zip.xml  
+        NOTE:  Modify the input and output filenames for each "wave"!
+
+        Chris Joakim, Microsoft, 2023
+    </description>
+
+    <!-- ******************************************************************* -->
+
+    <property name="workingDir"      value="work/" />
+    <property name="inputDir"        value="current/raw/" />
+    <property name="inputBasename"   value="MongoMigrationAssessment-wave-07.zip" />
+    <property name="outputBasename"  value="wave7_mma.jar" />
+    <property name="explodedDir"     value="work/MongoMigrationAssessment-wave-07" />
+    <property name="targetZipfile"   value="current/normalized/wave7_mma.jar" />
+
+    <target name="displayProperties">
+        <echo message="workingDir:     ${workingDir}" />
+        <echo message="inputDir:       ${inputDir}" />
+        <echo message="inputBasename:  ${inputBasename}" />
+        <echo message="outputBasename: ${outputBasename}" />
+        <echo message="explodedDir:    ${explodedDir}" />
+        <echo message="targetZipfile:  ${targetZipfile}" />
+    </target>
+
+    <target name="deleteDefineWorkingDirectory" depends="displayProperties">
+        <delete dir="${workingDir}" />
+        <mkdir  dir="${workingDir}" />
+    </target>
+
+    <target name="copyRawZip" depends="deleteDefineWorkingDirectory">
+        <copy file="${inputDir}${inputBasename}"
+              todir="${workingDir}"/>
+    </target>
+
+    <target name="unzipRawZip" depends="copyRawZip">
+        <unzip src="${workingDir}${inputBasename}"
+              dest="${workingDir}"/>
+    </target>
+
+    <target name="createNormalizedZip" depends="unzipRawZip">
+        <zip zipfile="${targetZipfile}"
+             basedir="${explodedDir}" />
+    </target>
+
+    <target name="cleanup" depends="createNormalizedZip">
+        <delete dir="${workingDir}" />
+    </target>
+
+</project>

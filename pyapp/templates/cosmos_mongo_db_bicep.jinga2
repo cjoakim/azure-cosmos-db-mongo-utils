@@ -1,0 +1,127 @@
+// Bicep file for a Cosmos DB Mongo API Database, with Containers, within an Account
+// Generated on {{ gen_timestamp }}
+
+// All of these parameters are optional, as they are provide values below:
+param accountName   string = '{{ cosmos_acct_name }}'
+param databaseName  string = '{{ dbname }}'
+param location      string = resourceGroup().location
+param primaryRegion string = '{{ region }}'
+param serverVersion string = '4.2'
+param defaultConsistencyLevel string = 'Eventual'
+
+param sharedAutoscaleMaxThroughput int = 1000
+param collectionAutoscaleMaxThroughput int = 1000
+
+param maxStalenessPrefix int = 100000
+param maxIntervalInSeconds int = 300
+
+var consistencyPolicies = {
+    Eventual: {
+        defaultConsistencyLevel: 'Eventual'
+    }
+    ConsistentPrefix: {
+        defaultConsistencyLevel: 'ConsistentPrefix'
+    }
+    Session: {
+        defaultConsistencyLevel: 'Session'
+    }
+    BoundedStaleness: {
+        defaultConsistencyLevel: 'BoundedStaleness'
+        maxStalenessPrefix:   maxStalenessPrefix
+        maxIntervalInSeconds: maxIntervalInSeconds
+    }
+    Strong: {
+        defaultConsistencyLevel: 'Strong'
+    }
+}
+
+var locations = [
+    {
+        locationName: primaryRegion
+        failoverPriority: 0
+        isZoneRedundant: false
+    }
+]
+
+// Create the Cosmos DB Mongo API Account
+// See https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/how-to-configure-capabilities
+
+resource account 'Microsoft.DocumentDB/databaseAccounts@2022-05-15' = {
+    name: accountName
+    location: location
+    kind: 'MongoDB'
+    properties: {
+        consistencyPolicy: consistencyPolicies[defaultConsistencyLevel]
+        locations: locations
+        databaseAccountOfferType: 'Standard'
+        enableAutomaticFailover: true
+        apiProperties: {
+            serverVersion: serverVersion
+        }
+        capabilities: [
+            { name: 'DisableRateLimitingResponses' }
+            { name: 'EnableMongo16MBDocumentSupport' }
+        ]
+    }
+}
+
+// Create the Cosmos DB Mongo API Database
+
+resource database 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases@2022-05-15' = {
+    parent: account
+    name: databaseName
+    properties: {
+        resource: {
+            id: databaseName
+        }
+
+        {% if db_level_throughput > 0 -%}
+        options: {
+            autoscaleSettings: {
+                maxThroughput: {{ db_level_throughput }}
+            }
+        }
+        {% endif %}
+
+    }
+}
+
+// Create the Cosmos DB Mongo API Containers (i.e. - collections)
+
+{% for c in containers -%}
+
+resource {{ c['cname'] }} 'Microsoft.DocumentDb/databaseAccounts/mongodbDatabases/collections@2022-05-15' = {
+    parent: database
+    name: '{{ c['cname'] }}'
+    properties: {
+        resource: {
+            id: '{{ c['cname'] }}'
+            {% if c['partition_key'] | length > 0 -%}
+
+            shardKey: {
+                {{c['partition_key']}}: 'Hash'
+            }
+            {% endif -%}
+        }
+
+        indexes: [
+            {
+                key: {
+                    keys: [
+                        '_id'
+                    ]
+                }
+            }
+        ]
+        {% if c['ru'] > 0 -%}
+        options: {
+            autoscaleSettings: {
+                maxThroughput: collectionAutoscaleMaxThroughput
+            }
+        }
+        {% endif %}
+
+    }
+}
+
+{% endfor %}

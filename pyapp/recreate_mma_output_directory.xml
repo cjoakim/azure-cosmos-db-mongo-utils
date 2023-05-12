@@ -1,0 +1,27 @@
+<project name="deleteDefineMmaOutputDirectory" default="deleteDefineMmaOutputDirectory" basedir=".">
+
+    <description>
+        Apache Ant script to:
+        1) Delete and recreate the MongoMigrationAssessment directory
+
+        See https://ant.apache.org/
+
+        ant -f recreate_mma_output_directory.xml
+        
+        Chris Joakim, Microsoft, 2023
+    </description>
+
+    <!-- ******************************************************************* -->
+
+    <property name="mmaOutputDirectory" value="/Users/${user.name}/AppData/Local/Temp/MongoMigrationAssessment/" />
+
+    <target name="displayProperties">
+        <echo message="mmaOutputDirectory: ${mmaOutputDirectory}" />
+    </target>
+
+    <target name="deleteDefineMmaOutputDirectory" depends="displayProperties">
+        <delete dir="${mmaOutputDirectory}" />
+        <mkdir  dir="${mmaOutputDirectory}" />
+    </target>
+
+</project>

@@ -1,0 +1,37 @@
+
+# PowerShell script to execute a Cosmos DB deployment, including
+# resource group creation, database creation, and container creation.
+
+# MongoDB Cluster Name:    {{ source_cluster_name }}
+# Cosmos DB Account Name:  {{ cosmos_acct_name }}
+# Cosmos DB Database Name: {{ dbname }}
+# Generated on:            {{ gen_timestamp }}
+# Template:                ps1_deploy_template.txt
+
+#$subscription={{ subscription }}
+$subscription=$Env:AZURE_SUBSCRIPTION_ID
+$resource_group='{{ resource_group }}'
+$region='{{ region }}'
+$tmp_dir='tmp'
+
+if (Test-Path -Path $tmp_dir) {
+    # the directory already exists
+}
+else {
+    Write-Host("creating directory: {0} ..." -f $tmp_dir)
+    New-Item -ItemType "directory" -Path $tmp_dir
+}
+
+Write-Host ("creating resource group: {0} in subscription: {1} ..." -f $resource_group, $subscription)
+az group create `
+    --location     $region `
+    --name         $resource_group `
+    --subscription $subscription
+
+Write-Host ("creating bicep deployment...")
+az deployment group create {{ what_if_clause }}`
+    --resource-group $resource_group `
+    --template-file {{ bicep_base }} {{redirect}}
+
+Write-Output 'done'
+

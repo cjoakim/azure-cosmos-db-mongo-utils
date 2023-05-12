@@ -1,0 +1,19 @@
+{
+  "migration1": {
+    "cluster": "1-US-DEV (SOMETHING)",
+    "source": "mongodb+srv://mongodb-source1...",
+    "target": "mongodb://cosmosdb-target1...",
+    "databases": [],
+    "collections": []
+  },
+  "migration2": {
+    "cluster": "1-US-UAT (SOMETHING)",
+    "source": "mongodb+srv://mongodb-source2...",
+    "target": "mongodb://cosmosdb-target2...",
+    "databases": [
+      "customers",
+      "sales"
+    ],
+    "collections": []
+  }
+}
