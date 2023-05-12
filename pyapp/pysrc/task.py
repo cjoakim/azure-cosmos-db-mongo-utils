@@ -433,7 +433,12 @@ class Tasks(object):
             ws = wb[wsname]
             col_count = ws.max_column
             row_count = ws.max_row
-            mdb_cred  = FS.read_single_line('current/cred/mdb-cred.txt')
+            mdb_cred  = 'user:pass'
+            try:
+                mdb_cred = FS.read_single_line('current/cred/mdb-cred.txt')
+            except:
+                print('unable to read file "current/cred/mdb-cred.txt"; using defaults')
+
             print('mdb_cred: {}'.format(mdb_cred))
             tr.log('worksheet: {}, cols: {}, rows: {}'.format(wsname, col_count, row_count))
             for r in range(2, row_count):
