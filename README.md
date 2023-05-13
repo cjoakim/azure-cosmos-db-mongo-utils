@@ -55,6 +55,15 @@ This functionality depends on a customer-specific source/target Excel mapping fi
 - https://github.com/cjoakim/mongodb-docscan  (public)
 - Reads source MongoDB clusters, identifies largest 10 documents in each container
 
+### MongoDB Data Generator
+
+- https://github.com/cjoakim/azure-cosmosdb-swift-data-generator
+- Generates testing data, including large and very large documents
+
+### Original Batch/Transforming Migration Process
+
+- https://github.com/Azure-Samples/azure-cosmos-db-mongo-migration
+
 ---
 
 ## Directory Structure of this Repo
