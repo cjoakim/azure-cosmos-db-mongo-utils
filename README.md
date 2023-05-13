@@ -6,7 +6,7 @@ Public repo for Cosmos DB Mongo Utilities
 
 ## Functionality
 
-### Core
+### pyapp subproject core functionality
 
 This functionality has no dependency on customer source/target Excel mapping files.
 
@@ -16,10 +16,10 @@ This functionality has no dependency on customer source/target Excel mapping fil
   - See pyapp/collect_mma_outputs.ps1 and pyapp/collect_mma_outputs.sh
 - **Generate a single Excel Report from many MMA executions**
   - See pyapp/migration_wave_report.ps1 and pyapp/migration_wave_report.sh
-- **verify.py** - verify document counts and indices of target vs source DBs and collections
-- **indexes.py** - extract and compare source vs target indexes
+- **pyapp/verify.py** - verify document counts and indices of target vs source DBs and collections
+- **pyapp/indexes.py** - extract and compare source vs target indexes
 
-### Extended
+### pyapp subproject extended functionality
 
 This functionality depends on a customer-specific source/target Excel mapping files.
 
@@ -69,6 +69,12 @@ This functionality depends on a customer-specific source/target Excel mapping fi
 ## Directory Structure of this Repo
 
 ```
+├── changestream_consumer     <-- coming soon; CosmosDB Mongo API or MongoDB change-stream consumer, implemented in Java
+│
+├── changestream_producer     <-- coming soon; producer of DB activity for the above changestream_consumer, implemented in Java
+│
+├── mongodb_docscan           <-- coming soon; a MongoDB large document scanner, implemented in Java
+│
 └── pyapp                     <-- Most Python and Ant scripts you'll execute are here; Python app root directory
     ├── artifact_examples
     │   └── bicep_examples
