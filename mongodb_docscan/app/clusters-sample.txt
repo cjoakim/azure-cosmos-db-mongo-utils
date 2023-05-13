@@ -1,0 +1,3 @@
+<friendly-cluster-name-1>|mongodb+srv://<user>:<password>@<host1>
+<friendly-cluster-name-2>|mongodb+srv://<user>:<password>@<host2>
+<friendly-cluster-name-3>|mongodb+srv://<user>:<password>@<host3>

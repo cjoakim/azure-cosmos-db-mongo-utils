@@ -73,7 +73,7 @@ This functionality depends on a customer-specific source/target Excel mapping fi
 │
 ├── changestream_producer     <-- coming soon; producer of DB activity for the above changestream_consumer, implemented in Java
 │
-├── mongodb_docscan           <-- coming soon; a MongoDB large document scanner, implemented in Java
+├── mongodb_docscan           <-- work-in-progress; a MongoDB large document scanner, implemented in Java
 │
 └── pyapp                     <-- Most Python and Ant scripts you'll execute are here; Python app root directory
     ├── artifact_examples

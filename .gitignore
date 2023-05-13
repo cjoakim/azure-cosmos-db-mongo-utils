@@ -4,6 +4,7 @@
 **/*.class
 #**/*.jar
 **/*.pyc
+**/*.zip
 
 **/.idea/
 **/bin/*
@@ -42,6 +43,28 @@ pyapp/verify1.json
 pyapp/verify2.json 
 pyapp/verify3.json 
 pyapp/verify_*.json
+
+**/scan*.jar
+**/app/out/*.json
+**/clusters.txt
+**/DocScanResults*.json
+
+## generated per GitHub Gradle project type
+
+.gradle
+/build/
+
+# Ignore Gradle GUI config
+gradle-app.setting
+
+# Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
+!gradle-wrapper.jar
+
+# Cache of project
+.gradletasknamecache
+
+
+## generated per GitHub Python project type
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
