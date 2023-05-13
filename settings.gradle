@@ -1,0 +1,17 @@
+// Root Gradle Build File for the Java subprojects in this repo.
+// Chris Joakim, Microsoft, 2023
+
+rootProject.name = 'azure-cosmos-db-mongo-utils'
+
+include 'mongodb_docscan:app'
+
+
+// $ gradle -q projects
+
+// ------------------------------------------------------------
+// Root project 'azure-cosmos-db-mongo-utils'
+// ------------------------------------------------------------
+
+// Root project 'azure-cosmos-db-mongo-utils'
+// \--- Project ':mongodb_docscan'
+//      \--- Project ':mongodb_docscan:app'
