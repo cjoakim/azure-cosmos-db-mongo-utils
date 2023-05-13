@@ -5,6 +5,5 @@
 
 echo 'activating the python venv ...'
 source venv/bin/activate
-python --version
 
 pytest

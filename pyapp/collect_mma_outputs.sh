@@ -8,9 +8,6 @@ echo 'activating the python venv ...'
 source venv/bin/activate
 python --version
 
-echo 'deleting tmp\ files ...'
-rm tmp\*.*
-
 echo 'aggregate_mma_execution_output'
 python main.py aggregate_mma_execution_output
 

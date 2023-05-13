@@ -10,7 +10,7 @@ python --version
 echo 'docscan_results_report ...'
 python main.py docscan_results_report
 
-echo 'clusters_report (migration waves) ...'
-python main.py clusters_report
+echo 'migration_wave_report ...'
+python main.py migration_wave_report
 
 echo 'done'
