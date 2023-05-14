@@ -1,6 +1,7 @@
 import certifi
 import json
 import sys
+import traceback
 
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -22,13 +23,13 @@ class Mongo(object):
                 self._env = 'cosmos'
             else:
                 self._env = 'mongo'
-            self._client = MongoClient(opts['conn_string'])
+            self._client = MongoClient(opts['conn_string'], tlsCAFile=certifi.where())
         else:
             if 'cosmos.azure.com' in opts['host']:
                 self._env = 'cosmos'
             else:
                 self._env = 'mongo'
-            self._client = MongoClient(opts['host'], opts['port'])
+            self._client = MongoClient(opts['host'], opts['port'], tlsCAFile=certifi.where())
 
         if self.is_verbose():
             print(json.dumps(self._opts, sort_keys=False, indent=2))
@@ -39,7 +40,11 @@ class Mongo(object):
         return False
 
     def list_databases(self):
-        return self._client.list_database_names()
+        try:
+            return sorted(self._client.list_database_names())
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
 
     def list_collections(self):
         return self._db.list_collection_names()
@@ -51,6 +56,21 @@ class Mongo(object):
     def set_coll(self, collname):
         self._coll = self._db[collname]
         return self._coll
+
+    def get_coll_indexes(self, collname):
+        try:
+            self.set_coll(collname)
+            return self._coll.index_information()
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            error_data = dict()
+            error_data['get_coll_indexes_error'] = True
+            error_data['db'] = self._db.name
+            error_data['coll'] = collname
+            error_data['msg'] = str(e)
+
+    # crud below, meta above
 
     def insert_doc(self, doc):
         return self._coll.insert_one(doc)
