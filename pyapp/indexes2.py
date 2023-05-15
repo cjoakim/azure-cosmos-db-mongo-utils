@@ -5,11 +5,14 @@ Usage:
   Command-Line Format: 
     python indexes2.py capture key dbname collection
     python indexes2.py compare capture-file dbname collection
-  Examples:
-    python indexes2.py capture brown all all
-    python indexes2.py capture brown NFA all
-    python indexes2.py capture brown NFA requesters
-    python indexes2.py compare tmp/indexes_brown_all_all_20230515-1734.json NFA requesters
+  Examples - index capture process.  Captures the source and target indexes to a tmp JSON file:
+    python indexes2.py capture brown all all             <--- all databases, all collections
+    python indexes2.py capture brown NFA all             <--- all collections in the NFA database
+    python indexes2.py capture brown NFA requesters      <--- just the requesters collection in the NFA database
+  Examples - index comparison process.  Compares source vs target from a given capture JSON file.
+    python indexes2.py compare tmp/indexes_brown_NFA_all_20230515-1938.json NFA all
+    python indexes2.py compare tmp/indexes_brown_NFA_all_20230515-1938.json NFA all
+    python indexes2.py compare tmp/indexes_brown_NFA_all_20230515-1938.json NFA requesters
   Notes:
     1) <key> is a key in the verify.json dictionary
 """
@@ -151,6 +154,8 @@ def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
     if db_coll_key in target_db_colls.keys():
         target_coll_indexes = target_db_colls[db_coll_key]
 
+    print('=== comparing {}'.format(db_coll_key))
+
     if source_coll_indexes == None:
         if target_coll_indexes == None:
             print('db_coll_key {} is in neither source nor target'.format(db_coll_key))
@@ -177,6 +182,7 @@ def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
     for idx_name in target_coll_indexes.keys():
         agg_index_names[idx_name] = ''
     sorted_index_names = sorted(agg_index_names.keys())
+    print('aggregated index names in source and target coll: {}'.format(sorted_index_names))
 
     if very_verbose():
         print('--- source indexes for {}'.format(db_coll_key))
@@ -197,11 +203,18 @@ def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
         elif target_idx == None:
             print('target index {} not present for db/coll {}'.format(idx_name, db_coll_key))
         else:
-            source_json = json.dumps(target_coll_indexes, sort_keys=True)
-            target_json = json.dumps(target_coll_indexes, sort_keys=True)
+            # normalize the v: attribute by removing it
+            if 'v' in source_idx.keys():
+                source_idx['v'] = 'normalized for compare'
+            if 'v' in target_idx.keys():
+                target_idx['v'] = 'normalized for compare'
+
+            source_json = json.dumps(source_idx, sort_keys=True)
+            target_json = json.dumps(target_idx, sort_keys=True)
             print('source:  {}'.format(source_json))
             print('target:  {}'.format(target_json))
             print('matched: {}'.format(source_json == target_json))
+            print('---')
 
 def collect_index_names(source_target_indexes, target_coll_indexes):
     # return a sorted list of strings - the names of all source and target indexes
