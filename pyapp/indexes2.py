@@ -18,10 +18,13 @@ Usage:
 """
 
 # Enhancement List:
-# 1) <key> <db> all   <-- report on all indexes on all containers
-# 2) <key> all all    <-- report on all indexes on all containers in all databases
-# 3) sort the index results data
-# 4) diff the structure of each index
+# 1) merge the capture() and compress() into one operation
+# 2) omit the admin, config, and local databases
+# 3) normalize expireAtSeconds to an int before json compares
+# 4) colorized output
+
+# Non-Enhancement List:
+# 1) retail verify.json as it is easy to edit and keys are useful
 
 import copy
 import json
