@@ -45,7 +45,7 @@ def compare_instances(
             print(f'Databases not in target:',
                   Colors.WARNING, databases_not_in_target, Colors.ENDC)
 
-    for database_name in filtered_source_dbs:
+    for database_name in sorted(filtered_source_dbs):
         source_db = source_instance.get_database(database_name)
         target_db = target_instance.get_database(database_name)
         print(f'   Comparing database: {database_name}')
@@ -70,7 +70,7 @@ def compare_instances(
         if "system.views" in collections_in_any:
             collections_in_any.remove("system.views")
 
-        for collection_name in collections_in_any:
+        for collection_name in sorted(collections_in_any):
             source_collection = source_db.get_collection(collection_name)
             target_collection = target_db.get_collection(collection_name)
 
