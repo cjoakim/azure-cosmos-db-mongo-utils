@@ -2,17 +2,17 @@
 NOTE: indexes2.py is a new/enhanced version of indexes.py, currently under development.
 
 Usage:
-  Command-Line Format: 
-    python indexes2.py capture key dbname collection
-    python indexes2.py compare capture-file dbname collection
-  Examples - index capture process.  Captures the source and target indexes to a tmp JSON file:
-    python indexes2.py capture brown all all             <--- all databases, all collections
-    python indexes2.py capture brown NFA all             <--- all collections in the NFA database
-    python indexes2.py capture brown NFA requesters      <--- just the requesters collection in the NFA database
-  Examples - index comparison process.  Compares source vs target from a given capture JSON file.
-    python indexes2.py compare tmp/indexes_brown_NFA_all_20230515-1938.json NFA all
-    python indexes2.py compare tmp/indexes_brown_NFA_all_20230515-1938.json NFA all
-    python indexes2.py compare tmp/indexes_brown_NFA_all_20230515-1938.json NFA requesters
+  Command-Line Format:
+    python indexes2.py compare <key> <dbname> <collection>    <-- <key> is a key in your verify.json file
+    python indexes2.py compare_captured <key> <dbname> <collection> --infile <previous-capture-file>
+
+  Examples:
+    python indexes2.py compare brown all all          <--- all databases, all collections
+    python indexes2.py compare brown NFA all          <--- all collections in the NFA database
+    python indexes2.py compare brown NFA requesters   <--- just the requesters collection in the NFA database
+
+    python indexes2.py compare_captured brown NFA all --infile tmp/indexes_brown_all_all_20230517-1915.json
+
   Notes:
     1) <key> is a key in the verify.json dictionary
 """
@@ -48,13 +48,19 @@ def read_json_file(infile):
     with open(infile, 'rt') as f:
         return json.loads(f.read())
 
-def capture():
+def compare():
+    combined_dict = capture_source_target_index_info()
+    if combined_dict != None:
+        compare_captured(combined_dict)
+
+def capture_source_target_index_info():
     if len(sys.argv) > 3:
         config_key, cli_dbname, cli_cname = sys.argv[2], sys.argv[3], sys.argv[4]
         print('command-line args:')
         print('  config_key: {}'.format(config_key))
         print('  cli_dbname: {}'.format(cli_dbname))
         print('  cli_cname:  {}'.format(cli_cname))
+        combined_dict = None  # the return object to this method
 
         config_file = 'verify.json'
         if os.path.isfile(config_file):
@@ -82,50 +88,49 @@ def capture():
             print_options('error: file {} does not exist'.format(config_file))
     else:
         print_options('Error: invalid command line')
+    return combined_dict
 
-def compare():
-    if len(sys.argv) > 3:
-        try:
-            infile, cli_dbname, cli_cname = sys.argv[2], sys.argv[3], sys.argv[4]
-            print('command-line args; dbname: {}, cname: {}, infile: {}'.format(cli_dbname, cli_cname, infile))
+def compare_captured(combined_dict=None):
+    try:
+        if len(sys.argv) > 3:
+            config_key, cli_dbname, cli_cname = sys.argv[2], sys.argv[3], sys.argv[4]
+        for idx, arg in enumerate(sys.argv):
+            if arg == '--infile':
+                infile = sys.argv[idx + 1]
+                combined_dict = FS.read_json(infile)
 
-            # Read the input file produced by the capture() process
-            print('reading infile {}'.format(infile))
-            combined_dict = FS.read_json(infile)
-            print('infile source keys count: {}'.format(len(combined_dict['source'])))
-            print('infile target keys count: {}'.format(len(combined_dict['target'])))
+        print('infile source keys count: {}'.format(len(combined_dict['source'])))
+        print('infile target keys count: {}'.format(len(combined_dict['target'])))
 
-            print('filtering input to just the databases and containers specified on the command-line ...')
-            filtered_db_coll_dict = dict()
-            filtered_db_coll_dict['source'] = filtered_captured(combined_dict, 'source', cli_dbname, cli_cname)
-            filtered_db_coll_dict['target'] = filtered_captured(combined_dict, 'target', cli_dbname, cli_cname)
-            print('filtered_db_coll_dict source key count:  {}'.format(len(filtered_db_coll_dict['source'])))
-            if very_verbose():
-                print('filtered_db_coll_dict source key values: {}'.format(sorted(filtered_db_coll_dict['source'].keys())))
-            print('filtered_db_coll_dict target key count:  {}'.format(len(filtered_db_coll_dict['target'])))
-            if very_verbose():
-                print('filtered_db_coll_dict target key values: {}'.format(sorted(filtered_db_coll_dict['target'].keys())))
+        print('filtering input to just the databases and containers specified on the command-line ...')
+        filtered_db_coll_dict = dict()
+        filtered_db_coll_dict['source'] = filtered_captured(combined_dict, 'source', cli_dbname, cli_cname)
+        filtered_db_coll_dict['target'] = filtered_captured(combined_dict, 'target', cli_dbname, cli_cname)
+        print('filtered_db_coll_dict source key count:  {}'.format(len(filtered_db_coll_dict['source'])))
+        if very_verbose():
+            print('filtered_db_coll_dict source key values: {}'.format(sorted(filtered_db_coll_dict['source'].keys())))
+        print('filtered_db_coll_dict target key count:  {}'.format(len(filtered_db_coll_dict['target'])))
+        if very_verbose():
+            print('filtered_db_coll_dict target key values: {}'.format(sorted(filtered_db_coll_dict['target'].keys())))
 
-            print('collecting the aggregated set of db/coll names ...')
-            agg_db_coll_names = dict()
-            for db_coll_key in filtered_db_coll_dict['source']:
-                agg_db_coll_names[db_coll_key] = ''
-            for db_coll_key in filtered_db_coll_dict['target']:
-                agg_db_coll_names[db_coll_key] = ''
-            sorted_agg_db_coll_names = sorted(agg_db_coll_names.keys())
-            if very_verbose():
-                print('sorted_agg_db_coll_names: {}'.format(sorted_agg_db_coll_names))
+        print('collecting the aggregated set of db/coll names ...')
+        agg_db_coll_names = dict()
+        for db_coll_key in filtered_db_coll_dict['source']:
+            agg_db_coll_names[db_coll_key] = ''
+        for db_coll_key in filtered_db_coll_dict['target']:
+            agg_db_coll_names[db_coll_key] = ''
+        sorted_agg_db_coll_names = sorted(agg_db_coll_names.keys())
+        if very_verbose():
+            print('sorted_agg_db_coll_names: {}'.format(sorted_agg_db_coll_names))
 
-            for db_coll_key in sorted_agg_db_coll_names:
-                compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key)
+        for db_coll_key in sorted_agg_db_coll_names:
+            compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key)
 
-            outfile = 'tmp/indexes_filtered_db_coll_dict.json'
-            FS.write_json(filtered_db_coll_dict, outfile)
-        except Exception as e2:
-            print(str(e2))
-            print(traceback.format_exc())
-    else:
-        print_options('Error: invalid command line')
+        outfile = 'tmp/indexes_filtered_db_coll_dict.json'
+        FS.write_json(filtered_db_coll_dict, outfile)
+    except Exception as e2:
+        print(str(e2))
+        print(traceback.format_exc())
 
 def filtered_captured(combined_dict, source_or_target, cli_dbname, cli_cname):
     # Filter the input combined_dict to just the databases and containers specified on the command-line
@@ -150,7 +155,7 @@ def filtered_captured(combined_dict, source_or_target, cli_dbname, cli_cname):
 def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
     source_db_colls = filtered_db_coll_dict['source']
     target_db_colls = filtered_db_coll_dict['target']
-    source_db_coll_indexes, target_db_coll_indexes = None, None
+    source_coll_indexes, target_coll_indexes = None, None
 
     if db_coll_key in source_db_colls.keys():
         source_coll_indexes = source_db_colls[db_coll_key]
@@ -235,7 +240,8 @@ def names_match(cli_name, found_name):
 
 def collect_indexes(config_key, source_or_target, conn_string, cli_dbname, cli_cname):
     raw_data_dict = dict()  # return object
-    print('collect_indexes {} {} {} {} {}'.format(
+    print('')
+    print('collecting indexes for key: {} {} db: {} coll: {} {}'.format(
         config_key, source_or_target, cli_dbname, cli_cname, conn_string))
     try:
         opts = dict()
@@ -243,7 +249,7 @@ def collect_indexes(config_key, source_or_target, conn_string, cli_dbname, cli_c
         opts['verbose'] = False
         m = Mongo(opts)
 
-        for dbname in m.list_databases():
+        for dbname in sorted(filter_dbnames(m.list_databases())):
             if names_match(cli_dbname, dbname):
                 db_dict = dict()
                 raw_data_dict[dbname] = db_dict
@@ -252,19 +258,20 @@ def collect_indexes(config_key, source_or_target, conn_string, cli_dbname, cli_c
                 m.set_db(dbname)
                 for cname in m.list_collections():
                     if names_match(cli_cname, cname):
-                        print('{} dbname/coll match: {} {}'.format(source_or_target, dbname, cname))
                         db_dict[cname] = m.get_coll_indexes(cname)
+                        if verbose():
+                            print('{} dbname/coll match: {} {}'.format(source_or_target, dbname, cname))
+
     except Exception as e:
         print(str(e))
         print(traceback.format_exc())
     return raw_data_dict
 
-def get_sorted_db_names(mongo_client):
-    dbnames = mongo_client.list_database_names()
+def filter_dbnames(dbnames):
     for exclude_dbname in 'admin,local,config'.split(','):
         if exclude_dbname in dbnames:
             dbnames.remove(exclude_dbname)
-    return sorted(dbnames)
+    return dbnames
 
 def curr_timestamp():
     return arrow.utcnow().format('YYYYMMDD-HHmm')
@@ -288,10 +295,15 @@ if __name__ == "__main__":
         print_options('Error: no command-line args')
     else:
         func = sys.argv[1].lower()
-        if func == 'capture':
-            capture()
-        elif func == 'compare':
+        for idx, arg in enumerate(sys.argv):
+            if arg == '--infile':
+                infile = sys.argv[idx + 1]
+                combined_dict = FS.read_json(infile)
+
+        if func == 'compare':
             compare()
+        elif func == 'compare_captured':
+            compare_captured()
         else:
             print_options('Error: invalid command-line function: {}'.format(func))
 

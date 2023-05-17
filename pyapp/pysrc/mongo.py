@@ -47,15 +47,20 @@ class Mongo(object):
             print(traceback.format_exc())
 
     def list_collections(self):
-        return self._db.list_collection_names()
+        return self._db.list_collection_names(filter={'type': 'collection'})
 
     def set_db(self, dbname):
         self._db = self._client[dbname]
         return self._db
 
     def set_coll(self, collname):
-        self._coll = self._db[collname]
-        return self._coll
+        try:
+            self._coll = self._db[collname]
+            return self._coll
+        except Exception as e:
+            # observed: collection names must not start or end with '.'
+            print('Exception: '.format(str(e)))
+            return None
 
     def get_coll_indexes(self, collname):
         try:
@@ -156,6 +161,7 @@ class MongoDBInstance:
             if arg == '--list-dbs-and-colls':
                 return True
         return False
+        
     def get_database(self, database_name: str):
         return MongoDBDatabase(self.client[database_name])
 
