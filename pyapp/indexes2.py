@@ -167,7 +167,7 @@ def compare_db_coll_indexes(cli_dbname, cli_cname, filtered_db_coll_dict, db_col
     if names_match(cli_dbname, db_key):
         pass
     else:
-        print("bypassing db: {} \r".format(db_key))
+        print("bypassing db: {}".format(db_key), end='\r')
 
     print(f'{Colors.WHITE}=== comparing db: {db_key} coll: {coll_key} {Colors.ENDC}')
 
