@@ -67,14 +67,14 @@ def capture_source_target_index_info():
 
         config_file = 'verify.json'
         if os.path.isfile(config_file):
-            print('config file exists: {}'.format(config_file))
             config = read_json_file('verify.json')
             if config_key in config.keys():
                 migration_obj = config[config_key]
                 source_conn_string = migration_obj['source']
                 target_conn_string = migration_obj['target']
-                print('  source conn_str: {}'.format(source_conn_string))
-                print('  target conn_str: {}'.format(target_conn_string))
+                if verbose():
+                    print('  source conn_str: {}'.format(source_conn_string))
+                    print('  target conn_str: {}'.format(target_conn_string))
 
                 combined_dict = dict()
                 combined_dict['source'] = collect_indexes(
@@ -97,9 +97,10 @@ def compare_captured(combined_dict=None):
     try:
         if len(sys.argv) > 3:
             config_key, cli_dbname, cli_cname = sys.argv[2], sys.argv[3], sys.argv[4]
-            print('  config_key: {}'.format(config_key))
-            print('  cli_dbname: {}'.format(cli_dbname))
-            print('  cli_cname:  {}'.format(cli_cname))
+            if verbose():
+                print('  config_key: {}'.format(config_key))
+                print('  cli_dbname: {}'.format(cli_dbname))
+                print('  cli_cname:  {}'.format(cli_cname))
         for idx, arg in enumerate(sys.argv):
             if arg == '--infile':
                 infile = sys.argv[idx + 1]
@@ -285,9 +286,9 @@ def names_match(cli_name, found_name):
 
 def collect_indexes(config_key, source_or_target, conn_string, cli_dbname, cli_cname):
     raw_data_dict = dict()  # return object
-    print('')
-    print('collecting indexes for key: {} {} db: {} coll: {} {}'.format(
-        config_key, source_or_target, cli_dbname, cli_cname, conn_string))
+    if verbose():
+        print('collecting indexes for key: {} {} db: {} coll: {} {}'.format(
+            config_key, source_or_target, cli_dbname, cli_cname, conn_string))
     try:
         opts = dict()
         opts['conn_string'] = conn_string
