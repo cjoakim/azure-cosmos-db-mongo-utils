@@ -35,6 +35,7 @@ import traceback
 import arrow
 from docopt import docopt
 
+from pysrc.constants import Colors
 from pysrc.fs import FS
 from pysrc.mongo import Mongo, MongoDBInstance, MongoDBDatabase, MongoDBCollection
 
@@ -156,27 +157,32 @@ def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
     source_db_colls = filtered_db_coll_dict['source']
     target_db_colls = filtered_db_coll_dict['target']
     source_coll_indexes, target_coll_indexes = None, None
+    db_key = db_coll_key.split('|')[0]
+    coll_key = db_coll_key.split('|')[1]
 
     if db_coll_key in source_db_colls.keys():
         source_coll_indexes = source_db_colls[db_coll_key]
     if db_coll_key in target_db_colls.keys():
         target_coll_indexes = target_db_colls[db_coll_key]
 
-    print('=== comparing {}'.format(db_coll_key))
+    print(f'{Colors.WHITE}=== comparing db: {db_key} coll: {coll_key} {Colors.ENDC}')
 
     if source_coll_indexes == None:
         if target_coll_indexes == None:
-            print('db_coll_key {} is in neither source nor target'.format(db_coll_key))
+            #print('db_coll_key {} is in neither source nor target'.format(db_coll_key))
+            print(f'{Colors.YELLOW}    db: {db_key} coll: {coll_key} - is in neither source nor target {Colors.ENDC}')
             return
 
     if source_coll_indexes != None:
         if target_coll_indexes == None:
-            print('db_coll_key {} is in the source but not the target'.format(db_coll_key))
+            #print('db_coll_key {} is in the source but not the target'.format(db_coll_key))
+            print(f'{Colors.YELLOW}    db: {db_key} coll: {coll_key} - is in the source but not the target {Colors.ENDC}')
             return
 
     if source_coll_indexes == None:
         if target_coll_indexes != None:
-            print('db_coll_key {} is in the target but not the source'.format(db_coll_key))
+            #print('db_coll_key {} is in the target but not the source'.format(db_coll_key))
+            print(f'{Colors.YELLOW}    db: {db_key} coll: {coll_key} - is in the target but not the source {Colors.ENDC}')
             return
 
     # At this point the db/collection combo is in both source and target; compare their indexes.
@@ -221,7 +227,12 @@ def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
             target_json = json.dumps(target_idx, sort_keys=True)
             print('source:  {}'.format(source_json))
             print('target:  {}'.format(target_json))
-            print('matched: {}'.format(source_json == target_json))
+
+            matched = (source_json == target_json)
+            if matched:
+                print(f'{Colors.OKGREEN}matched: {matched} {Colors.ENDC}')
+            else:
+                print(f'{Colors.FAIL}matched: {matched} {Colors.ENDC}')
             print('---')
 
 def collect_index_names(source_target_indexes, target_coll_indexes):

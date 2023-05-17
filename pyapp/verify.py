@@ -21,7 +21,7 @@ import json
 import os.path
 import sys
 
-from pysrc.constants import Constants, Colors
+from pysrc.constants import Colors
 from pysrc.mongo import Mongo, MongoDBInstance, MongoDBDatabase, MongoDBCollection
 
 def compare_instances(
