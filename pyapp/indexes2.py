@@ -105,18 +105,19 @@ def compare_captured(combined_dict=None):
                 infile = sys.argv[idx + 1]
                 combined_dict = FS.read_json(infile)
 
-        print('source keys count: {}'.format(len(combined_dict['source'])))
-        print('target keys count: {}'.format(len(combined_dict['target'])))
+        # print('source keys count: {}'.format(len(combined_dict['source'])))
+        # print('target keys count: {}'.format(len(combined_dict['target'])))
 
         print('filtering input to just the databases and containers specified on the command-line ...')
         filtered_db_coll_dict = dict()
         filtered_db_coll_dict['source'] = filtered_captured(combined_dict, 'source', cli_dbname, cli_cname)
         filtered_db_coll_dict['target'] = filtered_captured(combined_dict, 'target', cli_dbname, cli_cname)
-        print('filtered_db_coll_dict source key count:  {}'.format(len(filtered_db_coll_dict['source'])))
-        if very_verbose():
+
+        if verbose():
+            print('filtered_db_coll_dict source key count:  {}'.format(len(filtered_db_coll_dict['source'])))
             print('filtered_db_coll_dict source key values: {}'.format(sorted(filtered_db_coll_dict['source'].keys())))
-        print('filtered_db_coll_dict target key count:  {}'.format(len(filtered_db_coll_dict['target'])))
-        if very_verbose():
+        if verbose():
+            print('filtered_db_coll_dict target key count:  {}'.format(len(filtered_db_coll_dict['target'])))
             print('filtered_db_coll_dict target key values: {}'.format(sorted(filtered_db_coll_dict['target'].keys())))
 
         print('collecting the aggregated set of db/coll names ...')
@@ -132,8 +133,8 @@ def compare_captured(combined_dict=None):
         for db_coll_key in sorted_agg_db_coll_names:
             compare_db_coll_indexes(cli_dbname, cli_cname, filtered_db_coll_dict, db_coll_key)
 
-        outfile = 'tmp/indexes_filtered_db_coll_dict.json'
-        FS.write_json(filtered_db_coll_dict, outfile)
+        # outfile = 'tmp/indexes_filtered_db_coll_dict.json'
+        # FS.write_json(filtered_db_coll_dict, outfile)
     except Exception as e2:
         print(str(e2))
         print(traceback.format_exc())
@@ -233,6 +234,24 @@ def compare_db_coll_indexes(cli_dbname, cli_cname, filtered_db_coll_dict, db_col
                 source_idx['v'] = 'normalized for compare'
             if 'v' in target_idx.keys():
                 target_idx['v'] = 'normalized for compare'
+
+            if 'expireAfterSeconds' in source_idx.keys():
+                source_idx['expireAfterSeconds'] = int(source_idx['expireAfterSeconds'])
+            if 'expireAfterSeconds' in target_idx.keys():
+                target_idx['expireAfterSeconds'] = int(target_idx['expireAfterSeconds'])
+
+                # example:
+                # "TTL_expiresAt": {
+                #     "v": 2,
+                #     "key": [
+                #         [
+                #             "expiresAt",
+                #             1
+                #         ]
+                #     ],
+                #     "background": true,
+                #     "expireAfterSeconds": 0
+                # }
 
             source_json = json.dumps(source_idx, sort_keys=True)
             target_json = json.dumps(target_idx, sort_keys=True)
