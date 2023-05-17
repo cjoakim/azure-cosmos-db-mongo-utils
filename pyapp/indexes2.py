@@ -9,6 +9,8 @@ Usage:
   Examples:
     python indexes2.py compare brown all all          <--- all databases, all collections
     python indexes2.py compare brown NFA all          <--- all collections in the NFA database
+    python indexes2.py compare brown NF@ all          <--- all collections in databases that contain NF
+    python indexes2.py compare brown NF@ req*         <--- collections containing req in databases that contain NF
     python indexes2.py compare brown NFA requesters   <--- just the requesters collection in the NFA database
 
     python indexes2.py compare_captured brown NFA all --infile tmp/indexes_brown_all_all_20230517-1915.json
@@ -95,13 +97,16 @@ def compare_captured(combined_dict=None):
     try:
         if len(sys.argv) > 3:
             config_key, cli_dbname, cli_cname = sys.argv[2], sys.argv[3], sys.argv[4]
+            print('  config_key: {}'.format(config_key))
+            print('  cli_dbname: {}'.format(cli_dbname))
+            print('  cli_cname:  {}'.format(cli_cname))
         for idx, arg in enumerate(sys.argv):
             if arg == '--infile':
                 infile = sys.argv[idx + 1]
                 combined_dict = FS.read_json(infile)
 
-        print('infile source keys count: {}'.format(len(combined_dict['source'])))
-        print('infile target keys count: {}'.format(len(combined_dict['target'])))
+        print('source keys count: {}'.format(len(combined_dict['source'])))
+        print('target keys count: {}'.format(len(combined_dict['target'])))
 
         print('filtering input to just the databases and containers specified on the command-line ...')
         filtered_db_coll_dict = dict()
@@ -125,7 +130,7 @@ def compare_captured(combined_dict=None):
             print('sorted_agg_db_coll_names: {}'.format(sorted_agg_db_coll_names))
 
         for db_coll_key in sorted_agg_db_coll_names:
-            compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key)
+            compare_db_coll_indexes(cli_dbname, cli_cname, filtered_db_coll_dict, db_coll_key)
 
         outfile = 'tmp/indexes_filtered_db_coll_dict.json'
         FS.write_json(filtered_db_coll_dict, outfile)
@@ -153,7 +158,7 @@ def filtered_captured(combined_dict, source_or_target, cli_dbname, cli_cname):
                     filtered_dict[key2] = coll_data
     return filtered_dict
 
-def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
+def compare_db_coll_indexes(cli_dbname, cli_cname, filtered_db_coll_dict, db_coll_key):
     source_db_colls = filtered_db_coll_dict['source']
     target_db_colls = filtered_db_coll_dict['target']
     source_coll_indexes, target_coll_indexes = None, None
@@ -164,6 +169,12 @@ def compare_db_coll_indexes(filtered_db_coll_dict, db_coll_key):
         source_coll_indexes = source_db_colls[db_coll_key]
     if db_coll_key in target_db_colls.keys():
         target_coll_indexes = target_db_colls[db_coll_key]
+
+    # Exit if this isn't a database or collection name of interest
+    if names_match(cli_dbname, db_key):
+        pass
+    else:
+        print("bypassing db: {} \r".format(db_key))
 
     print(f'{Colors.WHITE}=== comparing db: {db_key} coll: {coll_key} {Colors.ENDC}')
 
@@ -247,7 +258,11 @@ def collect_index_names(source_target_indexes, target_coll_indexes):
 def names_match(cli_name, found_name):
     if cli_name.lower() == 'all':
         return True
-    return cli_name == found_name
+    if '@' in cli_name:
+        cli_fuzzy = cli_name.replace('@', '')
+        return cli_fuzzy in found_name
+    else:
+        return cli_name == found_name
 
 def collect_indexes(config_key, source_or_target, conn_string, cli_dbname, cli_cname):
     raw_data_dict = dict()  # return object

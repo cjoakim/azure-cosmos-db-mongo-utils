@@ -59,7 +59,7 @@ class Mongo(object):
             return self._coll
         except Exception as e:
             # observed: collection names must not start or end with '.'
-            print('Exception - env: {} - {}'.format(self._env, str(e)))
+            print('Exception - {} connection - {}'.format(self._env, str(e)))
             return None
 
     def get_coll_indexes(self, collname):
