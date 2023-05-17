@@ -19,15 +19,6 @@ Usage:
     1) <key> is a key in the verify.json dictionary
 """
 
-# Enhancement List:
-# 1) merge the capture() and compress() into one operation
-# 2) omit the admin, config, and local databases
-# 3) normalize expireAtSeconds to an int before json compares
-# 4) colorized output
-
-# Non-Enhancement List:
-# 1) retail verify.json as it is easy to edit and keys are useful
-
 import copy
 import json
 import os.path
