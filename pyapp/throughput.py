@@ -1,26 +1,17 @@
 """
 Usage:
   Command-Line Format:     
-    python throughput.py <config-key> <action>
+    python throughput.py <config-key> <action> <optional-params>
         <config-key> is a key in your verify.json file
-        <action> is one of get_current_state, scale_down, etc. as shown below:
+        <action> is one of list_databases, get_current_statem scale_down, etc. as shown below:
   Examples:
     python throughput.py xxx list_databases
     python throughput.py xxx list_databases_and_collections
     python throughput.py xxx get_current_state
-    python throughput.py xxx scale_down -preview_only       <-- preview the changes only
-    python throughput.py xxx scale_down -preview_only -v    <-- preview the changes, verbose
-    python throughput.py xxx scale_down                     <-- actually scale down
-
-  Notes:
-    1)  see the instructions in verify.py regarding configuration of
-        the Python virtual environment, and configuration file verify.json.
-    2)  The default input file is 'current/psql/mma_collection_ru.csv',
-        but this can be overridden with the --infile flag.
+    python throughput.py xxx scale_down -preview_only      <-- preview the changes only
+    python throughput.py xxx scale_down -preview_only -v   <-- preview the changes, verbose
+    python throughput.py xxx scale_down                    <-- actually scale down
 """
-
-# Enhancement List:
-# 1) simpler lookup by cosmos host, sorted by db
 
 # Developer Notes:
 # https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/how-to-provision-throughput
@@ -160,17 +151,20 @@ def scale_down(client, migration_obj):
                     if preview_only():
                         pass
                     else:
-                        try:
-                            command = dict()
-                            command['customAction'] = 'UpdateCollection'
-                            command['collection'] = cname
-                            command['autoScaleSettings'] = new_ru_value
-                            result = db.command(command)
-                            print(result)
-                        except Exception as e:
-                            print(traceback.format_exc())
-        else:
-            print("found cosmos database {}, but it's not in the MMA data".format(dbname))
+                        if provisioning_type != 'container_autoscale':
+                            print('not updating throughput because container is not container_autoscale')
+                        else:
+                            try:
+                                command, autoscaleObj = dict(), dict()
+                                autoscaleObj['maxThroughput'] = new_ru_value
+                                command['customAction'] = 'UpdateCollection'
+                                command['collection'] = cname
+                                command['autoScaleSettings'] = autoscaleObj
+                                print(command)
+                                result = db.command(command)
+                                print(result)
+                            except Exception as e:
+                                print(traceback.format_exc())
 
 def get_database_throughput(db):
     try:
