@@ -62,6 +62,7 @@ def get_current_state(client, migration_obj):
             dbnames.remove(exclude_dbname)
     for dbname in sorted(dbnames):
         if array_match(migration_obj['databases'], dbname):
+            print('')
             print("=== database: {}".format(dbname))
             db = client[dbname]
             db_throughput = get_database_throughput(db)
@@ -118,7 +119,8 @@ def scale_down(client, migration_obj):
             collections = db.list_collection_names(filter={'type': 'collection'})
             for cname in sorted(collections):
                 if array_match(migration_obj['collections'], cname):
-                    print("---collection {} in database: {}".format(cname, dbname))
+                    print("")
+                    print("---processing collection {} in database: {}".format(cname, dbname))
                     coll_throughput = get_collection_throughput(db, cname)
                     summary_tokens = coll_throughput['__summary__'].split(':')  # "container_autoscale:10000"
                     provisioning_type = summary_tokens[0]
@@ -154,17 +156,19 @@ def scale_down(client, migration_obj):
                         if provisioning_type != 'container_autoscale':
                             print('not updating throughput because container is not container_autoscale')
                         else:
-                            try:
-                                command, autoscaleObj = dict(), dict()
-                                autoscaleObj['maxThroughput'] = new_ru_value
-                                command['customAction'] = 'UpdateCollection'
-                                command['collection'] = cname
-                                command['autoScaleSettings'] = autoscaleObj
-                                print(command)
-                                result = db.command(command)
-                                print(result)
-                            except Exception as e:
-                                print(traceback.format_exc())
+                            if curr_ru_value == new_ru_value:
+                                print('not updating throughput because container because RU value is correct')
+                            else:
+                                try:
+                                    command, autoscaleObj = dict(), dict()
+                                    autoscaleObj['maxThroughput'] = new_ru_value
+                                    command['customAction'] = 'UpdateCollection'
+                                    command['collection'] = cname
+                                    command['autoScaleSettings'] = autoscaleObj
+                                    result = db.command(command)
+                                    print(result)
+                                except Exception as e:
+                                    print(traceback.format_exc())
 
 def get_database_throughput(db):
     try:
