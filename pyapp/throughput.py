@@ -3,14 +3,15 @@ Usage:
   Command-Line Format:     
     python throughput.py <config-key> <action>
         <config-key> is a key in your verify.json file
-        <action> is one of get_current_throughput, scale_down, etc. as shown below:
+        <action> is one of get_current_state, scale_down, etc. as shown below:
   Examples:
     python throughput.py xxx list_databases
     python throughput.py xxx list_databases_and_collections
-    python throughput.py xxx get_current_throughput
-    python throughput.py xxx scale_down
-    python throughput.py xxx scale_down -v
-    python throughput.py xxx scale_up
+    python throughput.py xxx get_current_state
+    python throughput.py xxx scale_down -preview_only       <-- preview the changes only
+    python throughput.py xxx scale_down -preview_only -v    <-- preview the changes, verbose
+    python throughput.py xxx scale_down                     <-- actually scale down
+
   Notes:
     1)  see the instructions in verify.py regarding configuration of
         the Python virtual environment, and configuration file verify.json.
@@ -27,116 +28,19 @@ Usage:
 # https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/custom-commands
 
 import json
+import math
 import os.path
 import sys
 import traceback
-
-from docopt import docopt
 
 from pymongo import MongoClient
 import certifi
 
 from pysrc.env import Env
-from pysrc.fs import FS
-
-class Collection:
-    # Instances of this class represent a row from file 'current/psql/mma_collection_ru.csv'
-    def __init__(self, row):
-        self.row = row
-        self.valid = False
-        try:
-            # header row is:
-            # cluster,mma_sibling_cluster,database,container,est_migration_ru,est_post_migration_ru,source_host,cosmos_acct
-            self.cluster     = row[0].strip()
-            self.mma_cluster = row[1].strip()
-            self.database    = row[2].strip()
-            self.container   = row[3].strip()
-            self.est_migration_ru = int(row[4].strip())
-            self.est_post_migration_ru = int(row[5].strip())
-            self.source_host = row[6].strip()
-            self.cosmos_acct = row[7].strip()
-            self.valid = True
-        except:
-            pass
-
-    def as_dict(self):
-        d = dict()
-        d['cluster'] = self.cluster
-        d['mma_cluster'] = self.mma_cluster
-        d['database'] = self.database
-        d['container'] = self.container
-        d['est_migration_ru'] = self.est_migration_ru
-        d['est_post_migration_ru'] = self.est_post_migration_ru
-        d['source_host'] = self.source_host
-        d['cosmos_acct'] = self.cosmos_acct
-        return d
 
 def read_json_file(infile):
     with open(infile, 'rt') as f:
         return json.loads(f.read())
-
-def read_collection_ru_csv():
-    # the reporting process created this file.  input file with optional override
-    infile = 'current/psql/mma_collection_ru.csv'
-    for idx, arg in enumerate(sys.argv):
-        if arg == '--infile':
-            infile = sys.argv[idx + 1]
-            print('override infile specified: {}'.format(infile))
-
-    # read the csv file, cast into instances of Collection (see class above)
-    rows = FS.read_csv(infile)
-    expected_header_row = 'cluster,mma_sibling_cluster,database,container,est_migration_ru,est_post_migration_ru,source_host,cosmos_acct'.split(',')
-    collections = list()
-
-    for idx, row in enumerate(rows):
-        if idx == 0:
-            if row == expected_header_row:
-                print('header row is as expected')
-            else:
-                print(row)
-                print('header row is not as expected')
-        else:
-            c = Collection(row)
-            if c.valid:
-                collections.append(c)
-
-    print('read_collection_ru_csv completed, count: {} in file: {}'.format(len(collections), infile))
-    return collections
-
-def filter_collections(all_collections, migration_obj):
-    mongo_conn_str  = migration_obj['source']
-    cosmos_conn_str = migration_obj['target']
-    mongo_host  = mongo_conn_str.split('@')[1]
-    cosmos_host = cosmos_conn_str.split('@')[1].split(':')[0].split('.')[0]
-    cluster     = migration_obj['cluster']
-    databases   = migration_obj['databases']
-    collections = migration_obj['collections']
-
-    print('filter_collections, searching for cluster: "{}" in {} rows'.format(
-        cluster, len(all_collections)))
-
-    filtered = list()
-    sibling_cluster = None
-
-    for c in all_collections:
-        if cluster == c.cluster:
-            if c.cluster == c.mma_cluster:
-                filtered.append(c)
-            else:
-                sibling_cluster = c.mma_cluster
-
-    if len(filtered) < 1:
-        if sibling_cluster != None:
-            print('filter_collections, searching for sibling_cluster: {}'.format(sibling_cluster))
-            for c in all_collections:
-                if sibling_cluster == c.cluster:
-                    filtered.append(c)
-
-    if len(filtered) < 1:
-        if len(all_collections) > 0:
-            print(json.dumps(all_collections[0].as_dict(), sort_keys=False, indent=2))
-
-    return filtered
 
 def list_databases(client):
     dbnames = client.list_database_names()
@@ -157,9 +61,11 @@ def list_databases_and_collections(client):
         for cname in sorted(collections):
             print('database: {}  collection: {}'.format(dbname, cname))
 
-def get_current_throughput(client, migration_obj):
+def get_current_state(client, migration_obj):
     # https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/custom-commands#get-collection
     dbnames = client.list_database_names()
+    one_gb = 1024.0 * 1024.0 * 1024.0
+
     for exclude_dbname in 'admin,local,config'.split(','):
         if exclude_dbname in dbnames:
             dbnames.remove(exclude_dbname)
@@ -176,90 +82,95 @@ def get_current_throughput(client, migration_obj):
             collections = db.list_collection_names(filter={'type': 'collection'})
             for cname in sorted(collections):
                 if array_match(migration_obj['collections'], cname):
-                    print("---collection {} in database: {}".format(cname, dbname))
                     coll_throughput = get_collection_throughput(db, cname)
+                    stats = db.command("collStats", cname)
+                    doc_count, size_bytes = stats['count'], stats['count']
+                    gb = float(size_bytes) / one_gb
+                    gbstr = "%.4f" % gb
+
+                    print("---collection {} in database: {} docs: {} bytes: {} gb: {}".format(
+                        cname, dbname, doc_count, size_bytes, gbstr))
+
                     if Env.verbose():
                         print(json.dumps(coll_throughput, sort_keys=False, indent=2))
+                        print(json.dumps(stats, sort_keys=False, indent=2))
                     else:
                         print(coll_throughput['__summary__'])
         else:
             print("found database {}, but it's not in the verify.json key specification".format(dbname))
 
-def scale_throughput(client, migration_obj, filtered_collections, direction='down'):
-    # Either scale down or up the RUs the collections matching the verify.json key,
-    # per the RU values in 'psql/mma_collection_ru.csv', which were computed/generated
-    # at the time that the Excel Wave Report was created.
-    # NOTE: ONLY COLLECTION-LEVEL AUTOSCALE IS SUPPORTED BY BOTH THIS SCRIPT, AS
-    # WELL AS THE SPARK-BASED MIGRATION TOOL AT THIS TIME.
-    #
+def scale_down(client, migration_obj):
     # https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/custom-commands#update-database
 
     if len(migration_obj['databases']) < 1:
-        print('the array of databases in verify.json must not be empty for RU scaling; exiting')
-        return
-    if len(filtered_collections) < 1:
-        print('the list of collections per filter criteria is empty; exiting')
+        print('the array of databases in verify.json must not be empty for RU scaling.')
+        print('run this program with the "list_databases" option to discover the database names.')
         return
 
     dbnames = client.list_database_names()
-    unique_dbs = unique_databases(filtered_collections)
-    collection_dict = unique_collection_dict(filtered_collections)
+    one_gb = 1024.0 * 1024.0 * 1024.0
+
     for exclude_dbname in 'admin,local,config'.split(','):
         if exclude_dbname in dbnames:
             dbnames.remove(exclude_dbname)
+
     for dbname in sorted(dbnames):
-        if dbname in unique_dbs.keys():
-            if array_match(migration_obj['databases'], dbname):
-                print("=== database: {}".format(dbname))
-                db = client[dbname]
-                db_throughput = get_database_throughput(db)
-                if Env.verbose():
-                    print(json.dumps(db_throughput, sort_keys=False, indent=2))
-                else:
-                    print(db_throughput['__summary__'])
+        if array_match(migration_obj['databases'], dbname):
+            print("=== database: {}".format(dbname))
+            db = client[dbname]
+            db_throughput = get_database_throughput(db)
+            if Env.verbose():
+                print(json.dumps(db_throughput, sort_keys=False, indent=2))
+            else:
+                print(db_throughput['__summary__'])
 
-                collections = db.list_collection_names(filter={'type': 'collection'})
-                for cname in sorted(collections):
-                    db_coll_key = '{}|{}'.format(dbname, cname)
-                    if db_coll_key in collection_dict.keys():
-                        c = collection_dict[db_coll_key]
-                        if array_match(migration_obj['collections'], cname):
-                            print("---collection {} in database: {}".format(cname, dbname))
-                            coll_throughput = get_collection_throughput(db, cname)
-                            if Env.verbose():
-                                print(json.dumps(coll_throughput, sort_keys=False, indent=2))
-                            else:
-                                print(coll_throughput['__summary__'])
+            collections = db.list_collection_names(filter={'type': 'collection'})
+            for cname in sorted(collections):
+                if array_match(migration_obj['collections'], cname):
+                    print("---collection {} in database: {}".format(cname, dbname))
+                    coll_throughput = get_collection_throughput(db, cname)
+                    summary_tokens = coll_throughput['__summary__'].split(':')  # "container_autoscale:10000"
+                    provisioning_type = summary_tokens[0]
+                    curr_ru_value = int(summary_tokens[1])
+                    min_scale_down_ru_value = int(str(curr_ru_value)[:-1])  # 60000 -> 6000 or 1/10th
 
-                            try:
-                                command, max_autoscale = dict(), dict()
-                                if direction.lower() == 'up':
-                                    max_autoscale['maxThroughput'] = int(c.est_migration_ru)
-                                else:
-                                    max_autoscale['maxThroughput'] = int(c.est_post_migration_ru)
-                                command['customAction'] = 'UpdateCollection'
-                                command['collection'] = cname
-                                command['autoScaleSettings'] = max_autoscale
-                                result = db.command(command)
-                                print(result)
-                            except Exception as e:
-                                print(traceback.format_exc())
+                    stats = db.command("collStats", cname)
+                    doc_count, size_bytes = stats['count'], stats['count']
+                    gb = float(size_bytes) / one_gb
+                    gb_str = "%.4f" % gb
+
+                    physical_partitions = int(math.ceil(gb / 50.0))
+                    if physical_partitions < 1:
+                        physical_partitions = 1
+                    new_ru_value = int(physical_partitions * 1000)
+
+                    if new_ru_value < min_scale_down_ru_value:
+                        new_ru_value = min_scale_down_ru_value
+
+                    print("---coll: {} in db: {} docs: {} gb: {} prov: {} pp: {} curr_ru: {} new_ru: {}".format(
+                        cname, dbname, doc_count, gb_str, provisioning_type,
+                        physical_partitions, curr_ru_value, new_ru_value))
+
+                    if Env.verbose():
+                        print(json.dumps(coll_throughput, sort_keys=False, indent=2))
+                        print(json.dumps(stats, sort_keys=False, indent=2))
+                    else:
+                        print(coll_throughput['__summary__'])
+
+                    if preview_only():
+                        pass
+                    else:
+                        try:
+                            command = dict()
+                            command['customAction'] = 'UpdateCollection'
+                            command['collection'] = cname
+                            command['autoScaleSettings'] = new_ru_value
+                            result = db.command(command)
+                            print(result)
+                        except Exception as e:
+                            print(traceback.format_exc())
         else:
             print("found cosmos database {}, but it's not in the MMA data".format(dbname))
-
-def unique_databases(filtered_collections):
-    databases = dict()
-    for c in filtered_collections:
-        dbname = c.database
-        databases[dbname] = ''
-    return databases
-
-def unique_collection_dict(filtered_collections):
-    keys = dict()
-    for c in filtered_collections:
-        key = '{}|{}'.format(c.database, c.container)
-        keys[key] = c
-    return keys
 
 def get_database_throughput(db):
     try:
@@ -360,6 +271,12 @@ def array_match(array, item):
     print('array_match, item: {} is not in array: {}'.format(item, array))
     return False
 
+def preview_only():
+    for arg in sys.argv:
+        if arg == '-preview_only':
+            return True
+    return False
+
 def print_options(msg):
     print(msg)
     # arguments = docopt(__doc__, version='0.1.0')
@@ -380,27 +297,18 @@ if __name__ == "__main__":
             if config_key in config.keys():
                 migration_obj = config[config_key]
                 print(migration_obj)
-                mongo_conn_str = migration_obj['source']
                 cosmos_conn_str = migration_obj['target']
                 print('  cosmos_conn_str: {}'.format(cosmos_conn_str))
-                print('  mongo_conn_str:  {}'.format(mongo_conn_str))
-
                 client = MongoClient(cosmos_conn_str, tlsCAFile=certifi.where())
-
-                all_collections = read_collection_ru_csv()
-                filtered_collections = filter_collections(all_collections, migration_obj)
-                print('{} collections match the filtering criteria'.format(len(filtered_collections)))
 
                 if action == 'list_databases':
                     list_databases(client)
                 elif action == 'list_databases_and_collections':
                     list_databases_and_collections(client)
-                elif action == 'get_current_throughput':
-                    get_current_throughput(client, migration_obj)
+                elif action == 'get_current_state':
+                    get_current_state(client, migration_obj)
                 elif action == 'scale_down':
-                    scale_throughput(client, migration_obj, filtered_collections, 'down')
-                elif action == 'scale_up':
-                    scale_throughput(client, migration_obj, filtered_collections, 'up')
+                    scale_down(client, migration_obj)
                 else:
                     print_options('error: undefined action specified on the command line - {}'.format(action))
             else:
