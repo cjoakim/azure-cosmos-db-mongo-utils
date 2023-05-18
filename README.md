@@ -69,9 +69,11 @@ This functionality depends on a customer-specific source/target Excel mapping fi
 ## Directory Structure of this Repo
 
 ```
-├── changestream_consumer     <-- coming soon; CosmosDB Mongo API or MongoDB change-stream consumer, implemented in Java
+├── changestream_consumer     <-- coming soon; CosmosDB Mongo API or MongoDB change-stream consumer, implemented in Java,
+|                                 code is currently in a private repo
 │
-├── changestream_producer     <-- coming soon; producer of DB activity for the above changestream_consumer, implemented in Java
+├── changestream_producer     <-- coming soon; producer of DB activity for the above changestream_consumer, implemented in Java,
+|                                 code is currently in a private repo
 │
 ├── mongodb_docscan           <-- work-in-progress; a MongoDB large document scanner, implemented in Java
 │
