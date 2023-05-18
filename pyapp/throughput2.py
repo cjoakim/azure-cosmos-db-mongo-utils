@@ -10,7 +10,6 @@ Usage:
     python throughput.py xxx get_current_throughput
     python throughput.py xxx scale_down
     python throughput.py xxx scale_down -v
-    python throughput.py xxx scale_up
   Notes:
     1)  see the instructions in verify.py regarding configuration of
         the Python virtual environment, and configuration file verify.json.
@@ -125,80 +124,56 @@ def get_current_throughput(client, migration_obj):
             print("found database {}, but it's not in the verify.json key specification".format(dbname))
 
 def scale_throughput(client, migration_obj, filtered_collections, direction='down'):
-    # Either scale down or up the RUs the collections matching the verify.json key,
-    # per the RU values in 'psql/mma_collection_ru.csv', which were computed/generated
-    # at the time that the Excel Wave Report was created.
-    # NOTE: ONLY COLLECTION-LEVEL AUTOSCALE IS SUPPORTED BY BOTH THIS SCRIPT, AS
-    # WELL AS THE SPARK-BASED MIGRATION TOOL AT THIS TIME.
-    #
     # https://learn.microsoft.com/en-us/azure/cosmos-db/mongodb/custom-commands#update-database
 
     if len(migration_obj['databases']) < 1:
-        print('the array of databases in verify.json must not be empty for RU scaling; exiting')
-        return
-    if len(filtered_collections) < 1:
-        print('the list of collections per filter criteria is empty; exiting')
+        print('the array of databases in verify.json must not be empty for RU scaling.')
+        print('run this program with the "list_databases" option to discover the database names.')
         return
 
     dbnames = client.list_database_names()
-    unique_dbs = unique_databases(filtered_collections)
-    collection_dict = unique_collection_dict(filtered_collections)
+
     for exclude_dbname in 'admin,local,config'.split(','):
         if exclude_dbname in dbnames:
             dbnames.remove(exclude_dbname)
+
     for dbname in sorted(dbnames):
-        if dbname in unique_dbs.keys():
-            if array_match(migration_obj['databases'], dbname):
-                print("=== database: {}".format(dbname))
-                db = client[dbname]
-                db_throughput = get_database_throughput(db)
-                if Env.verbose():
-                    print(json.dumps(db_throughput, sort_keys=False, indent=2))
-                else:
-                    print(db_throughput['__summary__'])
+        if array_match(migration_obj['databases'], dbname):
+            print("=== database: {}".format(dbname))
+            db = client[dbname]
+            db_throughput = get_database_throughput(db)
+            if Env.verbose():
+                print(json.dumps(db_throughput, sort_keys=False, indent=2))
+            else:
+                print(db_throughput['__summary__'])
 
-                collections = db.list_collection_names(filter={'type': 'collection'})
-                for cname in sorted(collections):
-                    db_coll_key = '{}|{}'.format(dbname, cname)
-                    if db_coll_key in collection_dict.keys():
-                        c = collection_dict[db_coll_key]
-                        if array_match(migration_obj['collections'], cname):
-                            print("---collection {} in database: {}".format(cname, dbname))
-                            coll_throughput = get_collection_throughput(db, cname)
-                            if Env.verbose():
-                                print(json.dumps(coll_throughput, sort_keys=False, indent=2))
+            collections = db.list_collection_names(filter={'type': 'collection'})
+            for cname in sorted(collections):
+                db_coll_key = '{}|{}'.format(dbname, cname)
+                if array_match(migration_obj['collections'], cname):
+                    print("---collection {} in database: {}".format(cname, dbname))
+                    coll_throughput = get_collection_throughput(db, cname)
+                    if Env.verbose():
+                        print(json.dumps(coll_throughput, sort_keys=False, indent=2))
+                    else:
+                        print(coll_throughput['__summary__'])
+
+                    if False:
+                        try:
+                            command, max_autoscale = dict(), dict()
+                            if direction.lower() == 'up':
+                                max_autoscale['maxThroughput'] = int(c.est_migration_ru)
                             else:
-                                print(coll_throughput['__summary__'])
-
-                            try:
-                                command, max_autoscale = dict(), dict()
-                                if direction.lower() == 'up':
-                                    max_autoscale['maxThroughput'] = int(c.est_migration_ru)
-                                else:
-                                    max_autoscale['maxThroughput'] = int(c.est_post_migration_ru)
-                                command['customAction'] = 'UpdateCollection'
-                                command['collection'] = cname
-                                command['autoScaleSettings'] = max_autoscale
-                                result = db.command(command)
-                                print(result)
-                            except Exception as e:
-                                print(traceback.format_exc())
+                                max_autoscale['maxThroughput'] = int(c.est_post_migration_ru)
+                            command['customAction'] = 'UpdateCollection'
+                            command['collection'] = cname
+                            command['autoScaleSettings'] = max_autoscale
+                            result = db.command(command)
+                            print(result)
+                        except Exception as e:
+                            print(traceback.format_exc())
         else:
             print("found cosmos database {}, but it's not in the MMA data".format(dbname))
-
-def unique_databases(filtered_collections):
-    databases = dict()
-    for c in filtered_collections:
-        dbname = c.database
-        databases[dbname] = ''
-    return databases
-
-def unique_collection_dict(filtered_collections):
-    keys = dict()
-    for c in filtered_collections:
-        key = '{}|{}'.format(c.database, c.container)
-        keys[key] = c
-    return keys
 
 def get_database_throughput(db):
     try:
@@ -332,10 +307,8 @@ if __name__ == "__main__":
                     list_databases_and_collections(client)
                 elif action == 'get_current_throughput':
                     get_current_throughput(client, migration_obj)
-                # elif action == 'scale_down':
-                #     scale_throughput(client, migration_obj, filtered_collections, 'down')
-                # elif action == 'scale_up':
-                #     scale_throughput(client, migration_obj, filtered_collections, 'up')
+                elif action == 'scale_down':
+                    scale_throughput(client, migration_obj, 'down')
                 else:
                     print_options('error: undefined action specified on the command line - {}'.format(action))
             else:
