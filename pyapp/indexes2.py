@@ -1,5 +1,5 @@
 """
-NOTE: indexes2.py is a new/enhanced version of indexes.py, currently under development.
+NOTE: indexes2.py is a new/enhanced version of indexes.py.
 
 Usage:
   Command-Line Format:

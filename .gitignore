@@ -31,6 +31,7 @@
 **/tmp/*.txt
 **/tmp/*.xlsx
 **/tmp/*.xml
+**/tmp/indexes/
 **/venv/
 
 pyapp/mmaout/
