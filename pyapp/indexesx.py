@@ -6,7 +6,7 @@ Usage:
     python indexesx.py extract <txt-infile-with-connection-strings>
 
   Examples:
-    python indexesx.py extract tmp/conn_strings.txt
+    python indexesx.py extract tmp/conn_strings.txt > tmp/indexesx.log
 """
 
 import copy
@@ -39,7 +39,12 @@ def extract(infile):
         if len(stripped) > 20:
             conn_strings.append(stripped)
     for idx, conn_string in enumerate(sorted(conn_strings)):
-        extract_indexes_in_cluster(idx, conn_string)
+        try:
+            extract_indexes_in_cluster(idx, conn_string)
+        except Exception as e:
+            print('Exception on cluster {} {}'.format(idx, conn_string))
+            print(str(e))
+            print(traceback.format_exc())
     print('done')
 
 def extract_indexes_in_cluster(idx, conn_string):
@@ -48,10 +53,11 @@ def extract_indexes_in_cluster(idx, conn_string):
     print('===')
     print('processing cluster idx: {} url: {}'.format(idx, conn_string))
     cluster_dict, cluster_indexes = dict(), dict()
+    host = conn_string.split('@')[1] 
     cluster_dict['idx']  = idx 
-    cluster_dict['host'] = conn_string.split('@')[1] 
+    cluster_dict['host'] = host
     cluster_dict['indexes']  = cluster_indexes
-    cluster_outfile = 'tmp/indexes/{}.json'.format(idx)
+    cluster_outfile = 'tmp/indexes/{}.json'.format(host.replace('.','-'))
 
     if True:
         opts = dict()
