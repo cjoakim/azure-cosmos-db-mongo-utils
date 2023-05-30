@@ -33,6 +33,7 @@ import sys
 from docopt import docopt
 
 from pysrc.datasets import Datasets
+from pysrc.fs import FS
 from pysrc.task import Tasks
 
 
@@ -131,6 +132,17 @@ def despace_file(infile, outfile):
     tr = Tasks.despace_file(infile, outfile)
     tr.display()
 
+def adhoc():
+    in_lines = FS.read_lines('tmp/mma_1000.ps1')
+    out_lines = list()
+    for line in in_lines:
+        if '.exe' in line:
+            tokens = line.strip().split()
+            token  = tokens[2].replace('"','')
+            print(token)
+            out_lines.append(token)
+    FS.write_lines(out_lines, 'tmp/tokens.txt')
+
 def find_file_in_list(filenames, cluster_name, suffix):
     for filename in filenames:
         if cluster_name in filename:
@@ -178,5 +190,7 @@ if __name__ == "__main__":
         elif func == 'despace_file':
             infile, outfile = sys.argv[2], sys.argv[3]
             despace_file(infile, outfile)
+        elif func == 'adhoc':
+            adhoc()
         else:
             print_options('Error: invalid function: {}'.format(func))

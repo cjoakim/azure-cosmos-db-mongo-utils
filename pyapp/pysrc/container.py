@@ -178,17 +178,18 @@ class Container(object):
         self.data['provisioning_type'] = s
 
     def get_sharding_note(self):
-        if self.size_in_gb() < 20:
+        if self.size_in_gb() < 5.0:
             return ''
         else:
-            return 'must be sharded due to > 20GB'
+            return 'should be sharded due to > 5GB compressed storage'
 
     def get_report_note(self):
         return '{}.  {}'.format(self.data['provisioning_type'], self.get_sharding_note())
 
     def calculate(self):
         gb = self.size_in_gb()
-        pp = int(math.ceil(gb / 50))
+        gb_uncompressed = gb * 4.0
+        pp = int(math.ceil(gb_uncompressed / 50.0))
         if pp < 1:
             pp = 1
         self.set_pp(pp)

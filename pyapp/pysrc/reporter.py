@@ -511,7 +511,8 @@ class Reporter(object):
             return ''
 
     def pp_for_gb(self, gb):
-        pp = int(math.ceil(gb / 50))
+        gb_uncompressed = gb * 4.0
+        pp = int(math.ceil(gb_uncompressed / 50.0))
         if pp < 1:
             pp = 1
         return pp

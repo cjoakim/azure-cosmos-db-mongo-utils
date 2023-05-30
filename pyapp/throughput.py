@@ -132,7 +132,8 @@ def scale_down(client, migration_obj):
                     gb = float(size_bytes) / one_gb
                     gb_str = "%.4f" % gb
 
-                    physical_partitions = int(math.ceil(gb / 50.0))
+                    gb_uncompressed = gb * 4.0
+                    physical_partitions = int(math.ceil(gb_uncompressed / 50.0))
                     if physical_partitions < 1:
                         physical_partitions = 1
                     new_ru_value = int(physical_partitions * 1000)
