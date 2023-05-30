@@ -4,6 +4,7 @@ NOTE: indexesx.py is used to extract the indexes from given cluster urls
 Usage:
   Command-Line Format:
     python indexesx.py extract <txt-infile-with-connection-strings>
+    python indexesx.py analyze
 
   Examples:
     python indexesx.py extract tmp/conn_strings.txt > tmp/indexesx.log
@@ -19,6 +20,7 @@ import arrow
 from docopt import docopt
 
 from pysrc.constants import Colors
+from pysrc.counter import Counter
 from pysrc.fs import FS
 from pysrc.mongo import Mongo, MongoDBInstance, MongoDBDatabase, MongoDBCollection
 
@@ -85,6 +87,33 @@ def filter_dbnames(dbnames):
             dbnames.remove(exclude_dbname)
     return dbnames
 
+def analyze():
+    counter = Counter()
+    files = FS.walk('tmp/indexes')
+    unique_indexes = dict()
+    for file in files:
+        infile = file['full']
+        if infile.endswith('.json'):
+            print('processing file: {}'.format(infile))
+            cluster_data = FS.read_json(infile)
+            cluster_indexes = cluster_data['indexes']
+            db_cname_keys = sorted(cluster_indexes.keys())  
+            for db_cname_key in db_cname_keys:
+                # db_cname_key is in 'dbname|cname' format
+                coll_index_data = cluster_indexes[db_cname_key]
+                coll_index_names = coll_index_data.keys()
+                for coll_index_name in sorted(coll_index_names):
+                    index = coll_index_data[coll_index_name]
+                    index['v'] = '0'
+                    index['ns'] = 'normalized'
+                    del index['v']
+                    del index['ns']
+                    jstr = json.dumps(index, sort_keys=True)
+                    print(jstr)
+                    counter.increment(jstr)
+
+    FS.write_json(counter.get_data(), 'tmp/unique_indexes.json')
+
 def curr_timestamp():
     return arrow.utcnow().format('YYYYMMDD-HHmm')
 
@@ -112,5 +141,7 @@ if __name__ == "__main__":
         if func == 'extract':
             # python indexesx.py extract tmp/tokens.txt
             extract(sys.argv[2])
+        elif func == 'analyze':
+            analyze()
         else:
             print_options('Error: invalid command-line function: {}'.format(func))
