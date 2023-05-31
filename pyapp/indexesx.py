@@ -1,34 +1,34 @@
 """
-NOTE: indexesx.py is used to extract the indexes from given cluster urls
+indexesx.py is used to extract the indexes from a list of cluster
+urls given as an input text filename.  It is also used to analyze
+these extracted indexes.
 
 Usage:
   Command-Line Format:
     python indexesx.py extract <txt-infile-with-connection-strings>
     python indexesx.py analyze
-
   Examples:
     python indexesx.py extract tmp/conn_strings.txt > tmp/indexesx.log
 """
 
-import copy
 import json
-import os.path
 import sys
 import traceback
 
 import arrow
+
 from docopt import docopt
 
-from pysrc.constants import Colors
 from pysrc.counter import Counter
 from pysrc.fs import FS
-from pysrc.mongo import Mongo, MongoDBInstance, MongoDBDatabase, MongoDBCollection
+from pysrc.mongo import Mongo
+
 
 def print_options(msg):
     print(msg)
     # TODO - docopt not working?
-    # arguments = docopt(__doc__, version='1')
-    # print(arguments)
+    arguments = docopt(__doc__, version='1')
+    print(arguments)
 
 def read_json_file(infile):
     with open(infile, 'rt') as f:
