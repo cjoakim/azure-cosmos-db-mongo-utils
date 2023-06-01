@@ -6,6 +6,8 @@ Usage:
   Command-Line Format:
     python vcore.py extract <verify-json_key>
     python vcore.py create <verify-json_key>
+  Examples:
+    python vcore.py extract bw2vcore
 """
 
 import json
@@ -30,34 +32,17 @@ def read_json_file(infile):
     with open(infile, 'rt') as f:
         return json.loads(f.read())
 
-def extract(infile):
-    lines, conn_strings = FS.read_lines(infile), list()
-    for line in lines:
-        stripped = line.strip()
-        if len(stripped) > 20:
-            conn_strings.append(stripped)
-    for idx, conn_string in enumerate(sorted(conn_strings)):
-        try:
-            extract_indexes_in_cluster(idx, conn_string)
-        except Exception as e:
-            print('Exception on cluster {} {}'.format(idx, conn_string))
-            print(str(e))
-            print(traceback.format_exc())
-    print('done')
+def extract(config_key, run_config):
+    try:
+        print('beginning of extract()')
+        print('config_key:  {}'.format(config_key))
+        print('run_config:  {}'.format(run_config))
+        conn_string = run_config['source']
+        print('conn_string: {}'.format(conn_string))
 
-def extract_indexes_in_cluster(idx, conn_string):
-    if idx > 999999:
-        return
-    print('===')
-    print('processing cluster idx: {} url: {}'.format(idx, conn_string))
-    cluster_dict, cluster_indexes = dict(), dict()
-    host = conn_string.split('@')[1] 
-    cluster_dict['idx']  = idx 
-    cluster_dict['host'] = host
-    cluster_dict['indexes']  = cluster_indexes
-    cluster_outfile = 'tmp/indexes/{}.json'.format(host.replace('.','-'))
+        outfile = extract_filename(config_key)
+        extract_data = dict()
 
-    if True:
         opts = dict()
         opts['conn_string'] = conn_string
         opts['verbose'] = False
@@ -66,16 +51,25 @@ def extract_indexes_in_cluster(idx, conn_string):
         for dbname in sorted(filter_dbnames(m.list_databases())):
             m.set_db(dbname)
             for cname in m.list_collections():
-                print('db: {} cname: {} conn_string: {}'.format(dbname, cname, conn_string))
+                print('extracting metadata for db: {} cname: {}'.format(dbname, cname))
                 try:
                     db_coll_key = '{}|{}'.format(dbname, cname)
-                    cluster_indexes[db_coll_key] = {'pending': True}
-                    cluster_indexes[db_coll_key] = m.get_coll_indexes(cname)
+                    extract_data[db_coll_key] = {'pending': True}
+                    extract_data[db_coll_key] = m.get_coll_indexes(cname)
                 except Exception as e:
                     print(str(e))
                     print(traceback.format_exc())
 
-    FS.write_json(cluster_dict, cluster_outfile)
+    except KeyboardInterrupt:
+        print('terminating per KeyboardInterrupt')
+    except Exception as e:
+        print(str(e))
+        print(traceback.format_exc())
+
+    FS.write_json(extract_data, outfile)
+
+def extract_filename(config_key):
+    return 'tmp/vcore_extract_{}.json'.format(config_key)
 
 def filter_dbnames(dbnames):
     for exclude_dbname in 'admin,local,config'.split(','):
@@ -83,35 +77,36 @@ def filter_dbnames(dbnames):
             dbnames.remove(exclude_dbname)
     return dbnames
 
-def create():
-    print('todo - implement create()')
-    
-def analyze():
-    counter = Counter()
-    files = FS.walk('tmp/indexes')
-    unique_indexes = dict()
-    for file in files:
-        infile = file['full']
-        if infile.endswith('.json'):
-            print('processing file: {}'.format(infile))
-            cluster_data = FS.read_json(infile)
-            cluster_indexes = cluster_data['indexes']
-            db_cname_keys = sorted(cluster_indexes.keys())  
-            for db_cname_key in db_cname_keys:
-                # db_cname_key is in 'dbname|cname' format
-                coll_index_data = cluster_indexes[db_cname_key]
-                coll_index_names = coll_index_data.keys()
-                for coll_index_name in sorted(coll_index_names):
-                    index = coll_index_data[coll_index_name]
-                    index['v'] = '0'
-                    index['ns'] = 'normalized'
-                    del index['v']
-                    del index['ns']
-                    jstr = json.dumps(index, sort_keys=True)
-                    print(jstr)
-                    counter.increment(jstr)
+def create(config_key, run_config):
+    print('create() is not yet implemented')
 
-    FS.write_json(counter.get_data(), 'tmp/unique_indexes.json')
+def analyze(config_key, run_config):
+    print('analyze() is not yet implemented')
+    # counter = Counter()
+    # files = FS.walk('tmp/indexes')
+    # unique_indexes = dict()
+    # for file in files:
+    #     infile = file['full']
+    #     if infile.endswith('.json'):
+    #         print('processing file: {}'.format(infile))
+    #         cluster_data = FS.read_json(infile)
+    #         cluster_indexes = cluster_data['indexes']
+    #         db_cname_keys = sorted(cluster_indexes.keys())
+    #         for db_cname_key in db_cname_keys:
+    #             # db_cname_key is in 'dbname|cname' format
+    #             coll_index_data = cluster_indexes[db_cname_key]
+    #             coll_index_names = coll_index_data.keys()
+    #             for coll_index_name in sorted(coll_index_names):
+    #                 index = coll_index_data[coll_index_name]
+    #                 index['v'] = '0'
+    #                 index['ns'] = 'normalized'
+    #                 del index['v']
+    #                 del index['ns']
+    #                 jstr = json.dumps(index, sort_keys=True)
+    #                 print(jstr)
+    #                 counter.increment(jstr)
+    #
+    # FS.write_json(counter.get_data(), 'tmp/unique_indexes.json')
 
 def curr_timestamp():
     return arrow.utcnow().format('YYYYMMDD-HHmm')
@@ -132,17 +127,22 @@ def very_verbose():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print_options('Error: no command-line args')
+    if len(sys.argv) < 3:
+        print_options('Error: missing command-line args')
     else:
         func = sys.argv[1].lower()
-
-        if func == 'extract':
-            # python indexesx.py extract tmp/tokens.txt
-            extract(sys.argv[2])
-        elif func == 'analyze':
-            analyze()
-        elif func == 'create':
-            create()
+        config_key = sys.argv[2].lower()
+        config = read_json_file('verify.json')
+        if config_key in config.keys():
+            run_config = config[config_key]
+            if func == 'extract':
+                # python indexesx.py extract tmp/tokens.txt
+                extract(config_key, run_config)
+            elif func == 'analyze':
+                analyze(config_key, run_config)
+            elif func == 'create':
+                create(config_key, run_config)
+            else:
+                print_options('Error: invalid command-line function: {}'.format(func))
         else:
-            print_options('Error: invalid command-line function: {}'.format(func))
+            print("key '{}' is not in file verify.json".format(config_key))
