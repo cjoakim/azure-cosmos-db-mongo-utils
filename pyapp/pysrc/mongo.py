@@ -46,6 +46,9 @@ class Mongo(object):
             print(str(e))
             print(traceback.format_exc())
 
+    def create_database(self, dbname):
+        return self._client[dbname]
+
     def list_collections(self):
         return self._db.list_collection_names(filter={'type': 'collection'})
 
