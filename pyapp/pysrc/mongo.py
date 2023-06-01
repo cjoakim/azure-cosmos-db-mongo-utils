@@ -49,6 +49,14 @@ class Mongo(object):
     def create_database(self, dbname):
         return self._client[dbname]
 
+    def delete_database(self, dbname):
+        if dbname in 'admin,local,config'.split(','):
+            return
+        self._client.drop_database(dbname)
+
+    def delete_container(self, cname):
+        self._db.drop_collection(cname)
+
     def list_collections(self):
         return self._db.list_collection_names(filter={'type': 'collection'})
 

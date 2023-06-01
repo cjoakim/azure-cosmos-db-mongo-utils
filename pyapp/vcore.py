@@ -38,10 +38,7 @@ def read_json_file(infile: str) -> dict:
 
 def extract_from_mongo(config_key: str, run_config: dict) -> None:
     try:
-        print('beginning of extract_from_mongo()')
-        print('config_key: {}'.format(config_key))
-        print('run_config: {}'.format(run_config))
-
+        print('=== beginning of extract_from_mongo()')
         outfile = extract_filename(config_key)
         extract_data = dict()  # db|collection is key, indexes dict is the value
 
@@ -81,10 +78,7 @@ def filter_dbnames(dbnames: list) -> list:
 
 def create_in_vcore(config_key: str, run_config: dict) -> None:
     try:
-        print('beginning of create_in_vcore()')
-        print('config_key: {}'.format(config_key))
-        print('run_config: {}'.format(run_config))
-
+        print('=== beginning of create_in_vcore()')
         infile = extract_filename(config_key)
         extract_data = read_json_file(infile)
         source_dbnames = collect_extract_db_names(extract_data)
@@ -108,7 +102,7 @@ def create_in_vcore(config_key: str, run_config: dict) -> None:
                     if result == True:
                         print('Ok - database created: {}'.format(source_dbname))
                     else:
-                        print('Error - database created: {}'.format(source_dbname))
+                        print('Error - database not created: {}'.format(source_dbname))
             else:
                 print('not migrating db: {} per verify.json config'.format(source_dbname))
 
@@ -143,15 +137,22 @@ def create_database(m: Mongo, dbname: str, max_attempts: int) -> bool:
                 return True
             else:
                 db = m.create_database(dbname)
-                print(db)
-                time.sleep(3)
+                m.set_db(dbname)
+                # this new db in pymongo is created only after a write to it
+                db.scaffolding.insert_one({"date": time.time()})  # insert a dummy doc in a dummy container
+                time.sleep(1.0)
+                m.delete_container['scaffolding']  # delete the dummy container, the db will still exist
+                time.sleep(3.0)
                 dbnames = m.list_databases()
+                print('create_database - dbnames after create_database: {}'.format(dbnames))
                 if dbname in dbnames:
                     return True
                 else:
-                    raise ValueError('create_database - dbname: {} is not in target account'.format(dbname))
-        except:
-            if attempt_num < max_attempts:
+                    raise ValueError('db not present')
+        except Exception as e:
+            print(str(e))
+            print(traceback.format_exc())
+            if attempt_num > max_attempts:
                 print('create_database - unsuccessful attempt {}, giving up'.format(attempt_num))
             else:
                 sleep_secs = attempt_num * 2
@@ -186,6 +187,8 @@ if __name__ == "__main__":
         config = read_json_file('verify.json')
         if config_key in config.keys():
             run_config = config[config_key]
+            print('run_config: {}'.format(run_config))
+
             if func == 'extract_from_mongo':
                 extract_from_mongo(config_key, run_config)
             elif func == 'create_in_vcore':
