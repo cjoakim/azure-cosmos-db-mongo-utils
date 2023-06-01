@@ -4,10 +4,10 @@ from a source Mongo database to a Cosmos DB Mongo/vCore account.
 
 Usage:
   Command-Line Format:
-    python vcore.py extract <verify-json_key>
-    python vcore.py create <verify-json_key>
+    python vcore.py extract_from_mongo <verify-json_key>
+    python vcore.py create_in_vcore <verify-json_key>
   Examples:
-    python vcore.py extract bw2vcore
+    python vcore.py extract_from_mongo bw2vcore
 """
 
 import json
@@ -23,25 +23,25 @@ from pysrc.fs import FS
 from pysrc.mongo import Mongo
 
 
-def print_options(msg):
+def print_options(msg: str):
     print(msg)
     arguments = docopt(__doc__, version='1')
     print(arguments)
 
-def read_json_file(infile):
+def read_json_file(infile: str):
     with open(infile, 'rt') as f:
         return json.loads(f.read())
 
-def extract(config_key, run_config):
+def extract_from_mongo(config_key: str, run_config: dict):
     try:
-        print('beginning of extract()')
+        print('beginning of extract_from_mongo()')
         print('config_key:  {}'.format(config_key))
         print('run_config:  {}'.format(run_config))
         conn_string = run_config['source']
         print('conn_string: {}'.format(conn_string))
 
         outfile = extract_filename(config_key)
-        extract_data = dict()
+        extract_data = dict()  # db|collection is key, indexes dict is the value
 
         opts = dict()
         opts['conn_string'] = conn_string
@@ -68,45 +68,17 @@ def extract(config_key, run_config):
 
     FS.write_json(extract_data, outfile)
 
-def extract_filename(config_key):
+def extract_filename(config_key: str):
     return 'tmp/vcore_extract_{}.json'.format(config_key)
 
-def filter_dbnames(dbnames):
+def filter_dbnames(dbnames: list):
     for exclude_dbname in 'admin,local,config'.split(','):
         if exclude_dbname in dbnames:
             dbnames.remove(exclude_dbname)
     return dbnames
 
-def create(config_key, run_config):
-    print('create() is not yet implemented')
-
-def analyze(config_key, run_config):
-    print('analyze() is not yet implemented')
-    # counter = Counter()
-    # files = FS.walk('tmp/indexes')
-    # unique_indexes = dict()
-    # for file in files:
-    #     infile = file['full']
-    #     if infile.endswith('.json'):
-    #         print('processing file: {}'.format(infile))
-    #         cluster_data = FS.read_json(infile)
-    #         cluster_indexes = cluster_data['indexes']
-    #         db_cname_keys = sorted(cluster_indexes.keys())
-    #         for db_cname_key in db_cname_keys:
-    #             # db_cname_key is in 'dbname|cname' format
-    #             coll_index_data = cluster_indexes[db_cname_key]
-    #             coll_index_names = coll_index_data.keys()
-    #             for coll_index_name in sorted(coll_index_names):
-    #                 index = coll_index_data[coll_index_name]
-    #                 index['v'] = '0'
-    #                 index['ns'] = 'normalized'
-    #                 del index['v']
-    #                 del index['ns']
-    #                 jstr = json.dumps(index, sort_keys=True)
-    #                 print(jstr)
-    #                 counter.increment(jstr)
-    #
-    # FS.write_json(counter.get_data(), 'tmp/unique_indexes.json')
+def create_in_vcore(config_key: str, run_config: dict):
+    print('create_in_vcore() is not yet implemented')
 
 def curr_timestamp():
     return arrow.utcnow().format('YYYYMMDD-HHmm')
@@ -135,13 +107,10 @@ if __name__ == "__main__":
         config = read_json_file('verify.json')
         if config_key in config.keys():
             run_config = config[config_key]
-            if func == 'extract':
-                # python indexesx.py extract tmp/tokens.txt
-                extract(config_key, run_config)
-            elif func == 'analyze':
-                analyze(config_key, run_config)
-            elif func == 'create':
-                create(config_key, run_config)
+            if func == 'extract_from_mongo':
+                extract_from_mongo(config_key, run_config)
+            elif func == 'create_in_vcore':
+                create_in_vcore(config_key, run_config)
             else:
                 print_options('Error: invalid command-line function: {}'.format(func))
         else:
