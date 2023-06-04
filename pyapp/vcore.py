@@ -47,14 +47,24 @@ def extract_from_mongo(config_key: str, run_config: dict) -> None:
         opts['verbose'] = False
         m = Mongo(opts)
 
+        extract_coll_shard_info(m)
+
+        # shards = m.get_shards()
+        # for shard in shards:
+        #     print('shard: {}'.format(shard))
+
         for dbname in sorted(filter_dbnames(m.list_databases())):
             m.set_db(dbname)
             for cname in m.list_collections():
                 print('extracting metadata for db: {} cname: {}'.format(dbname, cname))
                 try:
                     db_coll_key = '{}|{}'.format(dbname, cname)
-                    extract_data[db_coll_key] = {'pending': True}
-                    extract_data[db_coll_key] = m.get_coll_indexes(cname)
+                    coll_data = {}
+                    extract_data[db_coll_key] = coll_data
+                    collstats = m.command_coll_stats(cname)
+                    #print('collstats: {}'.format(collstats))
+                    coll_data['indexes'] = m.get_coll_indexes(cname)
+                    coll_data['stats']   = str(collstats)
                 except Exception as e:
                     print(str(e))
                     print(traceback.format_exc())
@@ -81,7 +91,7 @@ def create_in_vcore(config_key: str, run_config: dict) -> None:
         print('=== beginning of create_in_vcore()')
         infile = extract_filename(config_key)
         extract_data = read_json_file(infile)
-        source_dbnames = collect_extract_db_names(extract_data)
+        source_dbnames = extract_db_names(extract_data)
 
         opts = dict()
         opts['conn_string'] = run_config['target']
@@ -97,12 +107,7 @@ def create_in_vcore(config_key: str, run_config: dict) -> None:
                 if source_dbname in vcore_dbnames:
                     print('database {} already exists in target'.format(source_dbname))
                 else:
-                    print('database {} does not exist in target; creating...'.format(source_dbname))
-                    result = create_database(m, source_dbname, 10)
-                    if result == True:
-                        print('Ok - database created: {}'.format(source_dbname))
-                    else:
-                        print('Error - database not created: {}'.format(source_dbname))
+                    create_database(m, source_dbname, extract_data)
             else:
                 print('not migrating db: {} per verify.json config'.format(source_dbname))
 
@@ -112,12 +117,34 @@ def create_in_vcore(config_key: str, run_config: dict) -> None:
         print(str(e))
         print(traceback.format_exc())
 
-def collect_extract_db_names(extract_data: dict) -> list:
+def extract_db_names(extract_data: dict) -> list:
     dbnames = dict()
     for key in extract_data.keys():
         dbname = key.split('|')[0]
         dbnames[dbname] = ''
     return sorted(dbnames.keys())
+
+def extract_collection_count_for_db(extract_data: dict, dbname: str) -> list:
+    count = 0
+    key_prefix = '{}|'.format(dbname)
+    for key in extract_data.keys():
+        if key.startswith(key_prefix):
+            count = count + 1
+    return count
+
+def extract_coll_shard_info(m: Mongo) -> None:
+    coll_data = list()
+    m.set_db("config")
+    m.set_coll("collections")
+    colls = m.find({})
+    for coll in colls:
+        print(str(type(coll)))
+        for key in 'lastmodEpoch,lastmod,uuid'.split(','):
+            if key in coll.keys():
+                del coll[key]
+        coll_data.append(coll)
+        print("coll: {}".format(coll))
+    FS.write_json(coll_data, 'tmp/colls.json')
 
 def array_match(array, item) -> bool:
     if len(array) == 0:
@@ -128,8 +155,12 @@ def array_match(array, item) -> bool:
                 return True
     return False
 
-def create_database(m: Mongo, dbname: str, max_attempts: int) -> bool:
-    for attempt_num in range(1, max_attempts + 1):
+def create_database(m: Mongo, dbname: str, extract_data: dict) -> bool:
+    print("--- create_database; dbname: {}".format(dbname))
+    db_key_prefix = '{}|'.format(dbname)
+    max_attempts = 10
+
+    for attempt_num in range(1, max_attempts):
         try:
             dbnames = m.list_databases()
             if dbname in dbnames:
@@ -138,11 +169,32 @@ def create_database(m: Mongo, dbname: str, max_attempts: int) -> bool:
             else:
                 db = m.create_database(dbname)
                 m.set_db(dbname)
-                # this new db in pymongo is created only after a write to it
-                db.scaffolding.insert_one({"date": time.time()})  # insert a dummy doc in a dummy container
-                time.sleep(1.0)
-                m.delete_container['scaffolding']  # delete the dummy container, the db will still exist
-                time.sleep(3.0)
+
+                commands_response = m.list_commands()
+                print('commands_response: {}'.format(commands_response))
+                for cmd_name in sorted(commands_response['commands'].keys()):
+                    print('---')
+                    print(cmd_name)
+                    print(commands_response['commands'][cmd_name])
+
+                extract_collection_count = extract_collection_count_for_db(extract_data, dbname)
+
+                if extract_collection_count < 1:
+                    # this new db in pymongo is created only after a write to it
+                    db.scaffolding.insert_one({"time": time.time()})  # insert a dummy doc in a dummy container
+                    time.sleep(1.0)
+                    m.delete_container['scaffolding']  # delete the dummy container, the db will still exist
+                    time.sleep(1.0)
+                else:
+                    for db_coll_key in extract_data.keys():
+                        if db_coll_key.startswith(db_key_prefix):
+                            cname = db_coll_key.split('|')[1]
+                            extract_indexes = extract_data[db_coll_key]
+                            c = create_collection(m, dbname, cname, extract_data[db_coll_key])
+
+
+
+
                 dbnames = m.list_databases()
                 print('create_database - dbnames after create_database: {}'.format(dbnames))
                 if dbname in dbnames:
@@ -159,6 +211,12 @@ def create_database(m: Mongo, dbname: str, max_attempts: int) -> bool:
                 print('create_database - unsuccessful attempt {}, sleeping for {} seconds'.format(attempt_num, sleep_secs))
                 time.sleep(sleep_secs)
     return False
+
+def create_collection(m: Mongo, dbname: str, cname: str, collection_data: dict):
+    print('create_collection - dbname: {} cname: {}'.format(dbname, cname))
+    m.set_db(dbname)
+    return m.create_coll(cname)
+
 
 def curr_timestamp() -> str:
     return arrow.utcnow().format('YYYYMMDD-HHmm')

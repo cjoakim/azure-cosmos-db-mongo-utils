@@ -73,6 +73,42 @@ class Mongo(object):
             print('Exception - {} connection - {}'.format(self._env, str(e)))
             return None
 
+    def command_db_stats(self):
+        return self._db.command({'dbstats': 1})
+
+    def command_coll_stats(self, cname):
+        return self._db.command("collStats", cname)
+
+    def command_list_commands(self):
+        return self._db.command('listCommands')
+
+    def command_sharding_status(self):
+        return self._db.command('printShardingStatus')
+
+    def get_shards(self):
+        self.set_db('config')
+
+        return self._db.shards.find()
+
+
+        #db.getMongo().getDB("config").shards.find()
+        # https://groups.google.com/g/mongodb-user/c/FtJ6JjtCXd8
+
+    def extension_command_get_database(self):
+        command = dict()
+        command['customAction'] = 'GetDatabase'
+        return self._db.command(command)
+
+    def get_shard_info(self):
+        shard_dict = dict()
+        for shard in self._client.config.shards.find():
+            shard_name = shard.get("_id")
+            shard_dict[shard_name] = shard
+        return shard_dict
+
+    def create_coll(self, cname):
+        return self._db[cname]
+
     def get_coll_indexes(self, collname):
         try:
             self.set_coll(collname)
