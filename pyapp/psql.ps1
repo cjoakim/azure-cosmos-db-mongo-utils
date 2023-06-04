@@ -1,7 +1,9 @@
 
 # PowerShell script to load a PostgreSQL database with MMA Report data
+#
 # Usage:
 # > .\psql.ps1 local dev current\psql\mma.sql
+#
 # Chris Joakim, Microsoft, 2023
 
 param(
