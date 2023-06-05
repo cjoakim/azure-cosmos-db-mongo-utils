@@ -90,7 +90,6 @@ def filter_dbnames(dbnames):
 def analyze():
     counter = Counter()
     files = FS.walk('tmp/indexes')
-    unique_indexes = dict()
     for file in files:
         infile = file['full']
         if infile.endswith('.json'):
@@ -112,7 +111,11 @@ def analyze():
                     print(jstr)
                     counter.increment(jstr)
 
-    FS.write_json(counter.get_data(), 'tmp/unique_indexes.json')
+    lines, data = list(), counter.get_data()
+    for key in sorted(data.keys()):
+        count = data[key]
+        lines.append('{}|{}'.format(count, key))
+    FS.write_lines(lines, 'tmp/unique_indexes.txt')
 
 def curr_timestamp():
     return arrow.utcnow().format('YYYYMMDD-HHmm')

@@ -11,7 +11,8 @@ class Counter(object):
 
     def increment(self, key):
         if key in self.data.keys():
-            self.data[key] = self.data[key] + 1
+            n = self.data[key] + 1
+            self.data[key] = n
         else:
             self.data[key] = 1
 
