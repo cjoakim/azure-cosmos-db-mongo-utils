@@ -39,6 +39,8 @@ pyapp/out/
 
 pyapp/pymongo_connect.ps1
 
+pyapp/mongo/
+
 pyapp/verify.json 
 pyapp/verify1.json 
 pyapp/verify2.json 
