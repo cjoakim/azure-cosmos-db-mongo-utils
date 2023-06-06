@@ -7,7 +7,9 @@ Options:
   --version     Show version.
 """
 
-# Chris Joakim, Microsoft
+# See https://www.mongodb.com/developer/languages/python/python-change-streams/
+
+# Chris Joakim, Microsoft, 2023
 
 import json
 import os
@@ -37,6 +39,9 @@ def consume(dbname, cname, conn_str):
         coll = db[cname]
         print("-\n{}".format(coll))
 
+
+        print("-initial find_one to verify database access:\n{}".format(coll.find_one({})))
+        
         # define the pipeline of changes to receive
         pipeline = [
             { '$match': { "operationType": { '$in': ["insert", "update", "replace"] } } },
@@ -44,7 +49,7 @@ def consume(dbname, cname, conn_str):
         ]
 
         print('starting to watch the change stream ...')
-        for change in db.watch(pipeline=pipeline, full_document='updateLookup'):
+        for change in coll.watch(pipeline=pipeline, full_document='updateLookup'):
             print('---')
             print("change event:\n{}".format(change))
             print("ns:\n{}".format(change['ns']))
