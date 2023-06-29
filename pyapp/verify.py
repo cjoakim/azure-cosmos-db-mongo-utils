@@ -4,6 +4,7 @@ Usage:
     python verify.py <key>     <--- where <key> is a key in the verify.json dictionary
   Examples:
     python verify.py brown
+    python verify.py brown --last-request-charge   <-- displays Cosmos document count RU charges
 Notes:
   1) First, edit your file verify.json (see verify-example.json)
      Then execute the following commands in PowerShell:
@@ -28,7 +29,8 @@ def compare_instances(
         source_instance: MongoDBInstance,
         target_instance: MongoDBInstance,
         specified_databases,
-        specified_collections):
+        specified_collections,
+        doc_count_method):
     source_dbs = set(source_instance.databases)
     target_dbs = set(target_instance.databases)
     filtered_source_dbs = filter_specified_databases(specified_databases, source_dbs)
@@ -74,8 +76,12 @@ def compare_instances(
             source_collection = source_db.get_collection(collection_name)
             target_collection = target_db.get_collection(collection_name)
 
-            compare_documents(collection_name, source_collection, target_collection)
-            # compare_sizes(source_collection, target_collection, source_db, target_db)
+            compare_documents(
+                collection_name,
+                source_collection,
+                target_collection,
+                doc_count_method)
+
             if collection_name in source_collections and collection_name in target_collections:
                 compare_indexes(source_collection, target_collection)
 
@@ -112,9 +118,17 @@ def compare_sizes(source_collection, target_collection, source_db, target_db):
             percent_difference = round((difference_in_bytes / size1) * 100, 2)
             print(f'           * Difference in percentage: {percent_difference}%')
 
-def compare_documents(collection_name, source_collection, target_collection):
-    num_documents_source = source_collection.get_num_documents()
-    num_documents_target = target_collection.get_num_documents()
+def compare_documents(
+        collection_name,
+        source_collection,
+        target_collection,
+        doc_count_method):
+
+    num_documents_source = source_collection.get_num_documents(doc_count_method)
+    num_documents_target = target_collection.get_num_documents(doc_count_method)
+    if '--last-request-charge' in sys.argv:
+        last_charge = target_collection.get_last_request_charge()
+        print('           ! last RU request charge: {}'.format(last_charge))
 
     diff_docs = num_documents_source - num_documents_target
     print(f'         - {collection_name}: {Colors.WARNING if diff_docs != 0 else Colors.OKGREEN}\
@@ -124,7 +138,7 @@ def compare_indexes(source_collection, target_collection):
     source_indexes = set(source_collection.get_indexes())
     target_indexes = set(target_collection.get_indexes())
 
-    indexes_not_in_both = source_indexes.symmetric_difference(target_indexes)
+    indexes_not_in_both   = source_indexes.symmetric_difference(target_indexes)
     indexes_not_in_source = indexes_not_in_both.intersection(target_indexes)
     indexes_not_in_target = indexes_not_in_both.intersection(source_indexes)
 
@@ -138,6 +152,16 @@ def read_json_file(infile):
     with open(infile, 'rt') as f:
         return json.loads(f.read())
 
+def get_doc_count_method(config):
+    """ default to 'estimate' if not specified as 'each'. """
+    if 'doc_count_method' in config:
+        method = config['doc_count_method']
+        if method.lower() == 'each':
+            return 'each'
+        else:
+            return 'estimate'
+    return 'estimate'
+
 def example_config():
     example = dict()
     migration1 = dict()
@@ -146,6 +170,7 @@ def example_config():
     migration1['target'] = "mongodb://cosmosdb-target1..."
     migration1['databases'] = []
     migration1['collections'] = []
+    migration1['doc_count_method'] = 'estimate'
     example['migration1'] = migration1
     migration2 = dict()
     migration1['cluster'] = "1-US-UAT (SOMETHING)"
@@ -153,7 +178,7 @@ def example_config():
     migration2['target'] = "mongodb://cosmosdb-target2..."
     migration2['databases'] = ['customers', 'sales']
     migration2['collections'] = []
-    migration2['cluster'] = '99-DK-UAT (DANISH-STOUT)'
+    migration2['doc_count_method'] = 'each'
     example['migration2'] = migration2
     return example
 
@@ -162,7 +187,7 @@ if __name__ == '__main__':
         config_key = sys.argv[1]
         print('config_key specified: {}'.format(config_key))
         # file verify.json is git-ignored; create your own based on verify-example.json
-        # print(json.dumps(example_config(), sort_keys=False, indent=2))
+        #print(json.dumps(example_config(), sort_keys=False, indent=2))
 
         config_file = 'verify.json'
         if os.path.isfile(config_file):
@@ -177,9 +202,16 @@ if __name__ == '__main__':
                 target_instance = MongoDBInstance(target_connection_string)
                 specified_databases = migration_obj['databases']
                 specified_collections = migration_obj['collections']
+                doc_count_method = get_doc_count_method(config)
                 print('specified_databases:   {}'.format(specified_databases))
                 print('specified_collections: {}'.format(specified_collections))
-                compare_instances(source_instance, target_instance, specified_databases, specified_collections)
+                print('doc_count_method:      {}'.format(doc_count_method))
+                compare_instances(
+                    source_instance,
+                    target_instance,
+                    specified_databases,
+                    specified_collections,
+                    doc_count_method)
             else:
                 print('error, file {} does not contain key: {}'.format(config_file, config_key))
         else:

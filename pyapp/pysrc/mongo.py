@@ -226,14 +226,25 @@ class MongoDBDatabase:
 class MongoDBCollection:
 
     def __init__(self, database, collection_name: str):
+        self.database = database
         self.collection = database[collection_name]
 
     def get_size(self, database):
         stats = database.database.command("collStats", self.collection.name)
         return stats['size']
 
-    def get_num_documents(self):
-        return self.collection.estimated_document_count()
+    def get_num_documents(self, doc_count_method='estimate'):
+        if str(doc_count_method).lower() == 'each':
+            return self.collection.count_documents({})
+        else:
+            return self.collection.estimated_document_count()
 
     def get_indexes(self):
         return self.collection.index_information()
+
+    def get_last_request_charge(self):
+        stats = self.database.command({'getLastRequestStatistics': 1})
+        if stats == None:
+            return -1
+        else:
+            return stats['RequestCharge']

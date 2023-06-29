@@ -1,19 +1,20 @@
 {
   "migration1": {
-    "cluster": "1-US-DEV (SOMETHING)",
+    "cluster": "1-US-UAT (SOMETHING)",
     "source": "mongodb+srv://mongodb-source1...",
     "target": "mongodb://cosmosdb-target1...",
     "databases": [],
-    "collections": []
+    "collections": [],
+    "doc_count_method": "estimate"
   },
   "migration2": {
-    "cluster": "1-US-UAT (SOMETHING)",
     "source": "mongodb+srv://mongodb-source2...",
     "target": "mongodb://cosmosdb-target2...",
     "databases": [
       "customers",
       "sales"
     ],
-    "collections": []
+    "collections": [],
+    "doc_count_method": "each"
   }
 }
